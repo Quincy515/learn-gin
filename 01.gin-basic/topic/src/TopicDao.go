@@ -21,8 +21,13 @@ func GetTopicDetail(c *gin.Context) {
 }
 
 func NewTopic(c *gin.Context) {
-	// 判断登录
-	c.String(200, "新增帖子")
+	topic := Topic{}
+	err := c.BindJSON(&topic)
+	if err != nil {
+		c.String(400, "参数错误:%s", err.Error())
+	} else {
+		c.JSON(200, topic)
+	}
 }
 
 func DeleteTopic(c *gin.Context) {

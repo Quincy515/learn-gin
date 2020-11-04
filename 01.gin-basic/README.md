@@ -562,7 +562,69 @@ func main() {
 
 `参数错误:Key: 'TopicQuery.Page' Error:Field validation for 'Page' failed on the 'required' tag`
 
+### 06. 内置验证器的初步使用
 
+实现新增帖子
+
+```go
+func NewTopic(c *gin.Context) {
+	topic := Topic{}
+	err := c.BindJSON(&topic)
+	if err != nil {
+		c.String(400, "参数错误:%s", err.Error())
+	} else {
+		c.JSON(200, topic)
+	}
+}
+```
+
+`Topic` 结构体修改为
+
+```go
+type Topic struct {
+	TopicID    int    `json:"id"`
+	TopicTitle string `json:"title" binding:"required"`
+}
+```
+
+访问 POST http://localhost:8080/v1/topics?token=custer 
+
+<img src="../imgs/03_post.png" style="zoom:75%;" />
+
+#### POST参数绑定
+
+**gin** 验证器来源于一个第三方库 https://github.com/go-playground/validator
+
+文档 https://godoc.org/github.com/go-playground/validator
+
+扩展下 `struct`
+
+```go
+type Topic struct {
+	TopicID         int    `json:"id"`
+	TopicTitle      string `json:"title" `
+	TopicShortTitle string `json:"stitle"` // 短标题
+	UserIP          string `json:"ip" `
+	TopicScore      int    `json:"score"`
+}
+```
+
+需求：
+
+1、标题长度必须是4-----20 
+2、短标题和 主标题 不能一样 `nefield`  必须一样使用 `eqfield`
+3、userip必须是ipv4形式  
+4、score要么不填`omitempty`，如果填必须大于5分
+
+```go
+type Topic struct {
+	TopicID         int    `json:"id"`
+	TopicTitle      string `json:"title"  binding:"min=4,max=20" `
+	TopicShortTitle string `json:"stitle"  binding:"nefield=TopicTitle"`
+	UserIP          string `json:"ip" binding:"ip4_addr"`
+	TopicScore      int    `json:"score" binding:"omitempty,gt=5"`
+}
+```
 
 
 
