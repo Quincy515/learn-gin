@@ -294,9 +294,147 @@ func main() {
 }
 ```
 
+### 04. 简单 Dao 层代码封装
 
+新建 `src` 目录，所有业务代码放入 `src` 目录下。
 
+新建文件 话题相关的**数据库操作** ，`TopicDao.go`
 
+```go
+package src
+
+import "github.com/gin-gonic/gin"
+
+func GetTopicDetail(c *gin.Context) {
+	c.String(200, "获取topicid=%s的帖子", c.Param("topic_id"))
+}
+```
+
+修改路由，注意这里是不能加小括号的。否则变成执行 `GetTopicDetail` 函数了
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	. "topic/src"
+)
+
+func main() {
+	router := gin.Default()
+
+	v1 := router.Group("/v1/topics")
+	{
+		v1.GET("/:topic_id", GetTopicDetail)
+	}
+
+	router.Run() // 8080
+}
+
+```
+
+最简单的封装，实际业务放到单独的文件中。
+
+#### 使用中间件模拟"鉴权"
+
+之前我们的路由是
+
+- `GET /v1/topics`  默认显示 所有 话题列表
+- `GET /v1/topics?username=xxoo`  显示用户发表的帖子
+- `GET /v1/topics/123` 显示帖子ID为123的详细内容
+
+现在增加需求
+
+- `POST /v1/topics`  外加JSON参数，即可进行帖子的新增 (注意，这玩意是需要登录的)
+- `DELETE /v1/topics/123`  删除帖子 （注意这玩意儿也要登录）
+
+接下来 我们现做简单的封装
+
+`POST /v1/topics?token=xxxxxx`
+
+比如需要登录的代码为
+
+```go
+func NewTopic(c *gin.Context) {
+	// 判断登录
+	c.String(200, "新增帖子")
+}
+
+func DeleteTopic(c *gin.Context) {
+	// 判断登录
+	c.String(200, "删除帖子")
+}
+```
+
+路由
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	. "topic/src"
+)
+
+func main() {
+	router := gin.Default()
+
+	v1 := router.Group("/v1/topics")
+	{
+		v1.GET("/:topic_id", GetTopicDetail)
+		v1.POST("", NewTopic)
+		v1.DELETE("/:topic_id", DeleteTopic)
+	}
+
+	router.Run() // 8080
+}
+
+```
+
+使用 **gin** 的中间件,
+
+```go
+// MustLogin 必须登录
+func MustLogin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if _, status := c.GetQuery("token"); !status {
+			c.String(http.StatusUnauthorized, "缺少 token 参数")
+			c.Abort()
+		} else {
+			c.Next()
+		}
+	}
+}
+```
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	. "topic/src"
+)
+
+func main() {
+	router := gin.Default()
+
+	v1 := router.Group("/v1/topics")
+	{
+		v1.GET("/:topic_id", GetTopicDetail)
+
+		v1.Use(MustLogin())
+		{
+			v1.POST("", NewTopic)
+			v1.DELETE("/:topic_id", DeleteTopic)
+		}
+	}
+
+	router.Run() // 8080
+}
+```
+
+- 访问 POST 请求 http://localhost:8080/v1/topics?token=123 可以看到 `新增帖子`
+- 访问 DELETE 请求 http://localhost:8080/v1/topics/101?token=123 可以看到 `删除帖子`
 
 
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	. "topic/src"
 )
 
 func main() {
@@ -16,9 +17,14 @@ func main() {
 				c.String(200, "获取用户=%s的帖子列表", c.Query("username"))
 			}
 		})
-		v1.GET("/:topic_id", func(c *gin.Context) {
-			c.String(200, "获取topicid=%s的帖子", c.Param("topic_id"))
-		})
+
+		v1.GET("/:topic_id", GetTopicDetail)
+
+		v1.Use(MustLogin())
+		{
+			v1.POST("", NewTopic)
+			v1.DELETE("/:topic_id", DeleteTopic)
+		}
 	}
 
 	router.Run() // 8080
