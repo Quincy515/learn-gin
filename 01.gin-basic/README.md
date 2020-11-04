@@ -1,3 +1,5 @@
+[toc]
+
 ### 01.最简单的服务启动
 
 分几步
@@ -220,11 +222,77 @@ func main() {
 
 获取参数可以使用 `c.Query()` , 没有就返回为空，可以使用 `c.DefaultQuery("abc", 1)` 设置默认返回值。
 
+### 03.是否要用 MVC 模式？
 
+<img src="../imgs/01_mvc.png" style="zoom:75%;" />
+<img src="../imgs/02_docker.png" style="zoom:75%;" />
 
+#### 路由分组
 
+```go
+package main
 
+import (
+	"github.com/gin-gonic/gin"
+)
 
+func main() {
+	router := gin.Default()
+
+	v1 := router.Group("/v1/topics")
+	v1.GET("", func(c *gin.Context) {
+		if c.Query("username") == "" {
+			c.String(200, "获取帖子列表")
+		} else {
+			c.String(200, "获取用户=%s的帖子列表", c.Query("username"))
+		}
+	})
+	v1.GET("/:topic_id", func(c *gin.Context) {
+		c.String(200, "获取topicid=%s的帖子", c.Param("topic_id"))
+	})
+
+	router.Run() // 8080
+}
+```
+
+使用代码块的方式区分作用域
+
+```go
+a:=1
+if a == 1 {----------------------{
+                    ============>   
+}--------------------------------}
+```
+
+代码块和 v1 没有强关联但是可以很清晰的区分出来
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	router := gin.Default()
+
+	v1 := router.Group("/v1/topics")
+	{
+		v1.GET("", func(c *gin.Context) {
+			if c.Query("username") == "" {
+				c.String(200, "获取帖子列表")
+			} else {
+				c.String(200, "获取用户=%s的帖子列表", c.Query("username"))
+			}
+		})
+		v1.GET("/:topic_id", func(c *gin.Context) {
+			c.String(200, "获取topicid=%s的帖子", c.Param("topic_id"))
+		})
+	}
+
+	router.Run() // 8080
+}
+```
 
 
 
