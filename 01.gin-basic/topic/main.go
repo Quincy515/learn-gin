@@ -2,11 +2,17 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	. "topic/src"
 )
 
 func main() {
 	router := gin.Default()
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("topicurl", TopicUrl)
+	}
 
 	v1 := router.Group("/v1/topics")
 	{

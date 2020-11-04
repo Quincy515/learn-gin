@@ -626,7 +626,139 @@ type Topic struct {
 }
 ```
 
+### 07. 自定义验证器结合正则验证JSON参数
 
+请求topic详细时 可以是：
+  `/topics/123  (ID形式)`
+
+也可以是
+  `/topics/wodetiezi`   (拼音样式的URL，或为了SEO等原因)
+
+因此扩展下
+
+```go
+type Topic struct {
+	TopicID         int    `json:"id"`
+	TopicTitle      string `json:"title" binding:"min=4,max=20"`
+	TopicShortTitle string `json:"stitle" binding:"required,nefield=TopicTitle"`
+	TopicUrl        string `json:"url" binding:"omitempty,topicurl"`
+	UserIP          string `json:"ip" binding:"ipv4"`
+	TopicScore      int    `json:"score" binding:"omitempty,gt=5"`
+}
+```
+
+注意 `TopicUrl` 验证规则，`omitempty` 表示可以忽略，但是有的话就需要符合自定义的 `topicurl` 规则
+
+<img src="../imgs/04.validator.png" style="zoom:80%;" />
+
+新建文件 `MyValidator.go` 放入自定义的验证函数
+
+```go
+package src
+
+import (
+	"fmt"
+	"github.com/go-playground/validator/v10"
+	"reflect"
+)
+
+// TopicUrl 自定义字段级别校验方法
+func TopicUrl(fl validator.FieldLevel) bool {
+	// 判断当前传入的 struct 是否是 Topic model
+	if data, ok := fl.Top().Interface().(*Topic); ok {
+		getValue := fl.Field().String()
+		fmt.Println(getValue, data)
+		return true
+	}
+	return false
+}
+```
+
+注意 `validator/v8` 的自定义校验
+
+```go
+func TopicUrl(v *validator.Validate, topStruct reflect.Value, currentStructOrField reflect.Value,
+	field reflect.Value, fieldType reflect.Type, fieldKind reflect.Kind, param string) bool {
+
+		if _,ok:= topStruct.Interface().(*Topic);ok{
+			 if matched,_:=regexp.MatchString(`^\w{4,10}$`,field.String());matched{
+			 	return true
+			 }
+		}
+		return false
+}
+```
+
+在 `main.go` 中关联 验证规则 `topicurl` 和验证函数 `TopicUrl`
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	. "topic/src"
+)
+
+func main() {
+	router := gin.Default()
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("topicurl", TopicUrl)
+	}
+
+	v1 := router.Group("/v1/topics")
+	{
+		v1.GET("", GetTopicList)
+
+		v1.GET("/:topic_id", GetTopicDetail)
+
+		v1.Use(MustLogin())
+		{
+			v1.POST("", NewTopic)
+			v1.DELETE("/:topic_id", DeleteTopic)
+		}
+	}
+
+	router.Run() // 8080
+}
+```
+
+#### 正则
+
+```go
+regexp.MatchString(pattern, srcstring)
+
+
+假设url只能是数字字母或下划线，且必须在4,10字符
+
+\w{4,10}
+
+	if _,ok:= topStruct.Interface().(*Topic);ok{
+		getValue:=field.String()
+		if ret,_:=regexp.MatchString("\\w{4,10}",getValue);ret{
+			return true
+		}
+
+	}
+```
+
+```go
+// TopicUrl 自定义字段级别校验方法
+func TopicUrl(fl validator.FieldLevel) bool {
+	// 判断当前传入的 struct 是否是 Topic model
+	if _, ok := fl.Top().Interface().(*Topic); ok {
+		getValue := fl.Field().String()
+		if ret, _ := regexp.MatchString("^\w{4,10}$", getValue); ret {
+			return true
+		}
+	}
+	return false
+}
+```
+
+<img src="../imgs/05_regexp.png" style="zoom:75%;" />
 
 
 

@@ -2,9 +2,10 @@ package src
 
 type Topic struct {
 	TopicID         int    `json:"id"`
-	TopicTitle      string `json:"title"  binding:"min=4,max=20" `
-	TopicShortTitle string `json:"stitle"  binding:"nefield=TopicTitle"`
-	UserIP          string `json:"ip" binding:"ip4_addr"`
+	TopicTitle      string `json:"title" binding:"min=4,max=20"`
+	TopicShortTitle string `json:"stitle" binding:"required,nefield=TopicTitle"`
+	TopicUrl        string `json:"url" binding:"omitempty,topicurl"`
+	UserIP          string `json:"ip" binding:"ipv4"`
 	TopicScore      int    `json:"score" binding:"omitempty,gt=5"`
 }
 
