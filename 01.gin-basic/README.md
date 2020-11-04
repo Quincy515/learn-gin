@@ -436,6 +436,132 @@ func main() {
 - 访问 POST 请求 http://localhost:8080/v1/topics?token=123 可以看到 `新增帖子`
 - 访问 DELETE 请求 http://localhost:8080/v1/topics/101?token=123 可以看到 `删除帖子`
 
+### 05. 创建Model
+
+创建帖子 model 文件 `TopicModel.go`
+
+```go
+package src
+
+type Topic struct {
+	TopicID    int
+	TopicTitle string
+}
+
+// CreateTopic 临时创建实体
+func CreateTopic(id int, title string) Topic {
+	return Topic{id, title}
+}
+```
+
+修改
+
+```go
+func GetTopicDetail(c *gin.Context) {
+	c.JSON(200, CreateTopic(101, "帖子标题"))
+}
+```
+
+访问 http://localhost:8080/v1/topics/123 可以看到 
+
+```json
+{
+    "TopicID": 101,
+    "TopicTitle": "帖子标题"
+}
+```
+
+修改 `struct` 
+
+```go
+type Topic struct {
+	TopicID    int    `json:"id"`
+	TopicTitle string `json:"title"`
+}
+```
+
+访问 http://localhost:8080/v1/topics/123 可以看到 
+
+```json
+{
+    "id": 101,
+    "title": "帖子标题"
+}
+```
+
+#### 参数绑定Model的初步使用
+
+1、query参数绑定 
+
+```go
+type TopicQuery struct {
+	UserName string `json:"username" form:"username"`
+	Page     int    `json:"page" form:"page" binding:"required"`
+	PageSize int    `json:"pagesize" form:"pagesize"`
+}
+```
+
+`form` (注意不是from)决定了绑定 `query` 参数的 `key` 到底是什么
+
+修改函数 `GetTopicList`
+
+```go
+// GetTopicList 获取帖子列表
+func GetTopicList(c *gin.Context) {
+	query := TopicQuery{}
+	err := c.BindQuery(&query)
+	if err != nil {
+		c.String(400, "参数错误:%s", err.Error())
+	} else {
+		c.JSON(200, query)
+	}
+}
+```
+
+路由
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	. "topic/src"
+)
+
+func main() {
+	router := gin.Default()
+
+	v1 := router.Group("/v1/topics")
+	{
+		v1.GET("", GetTopicList)
+
+		v1.GET("/:topic_id", GetTopicDetail)
+
+		v1.Use(MustLogin())
+		{
+			v1.POST("", NewTopic)
+			v1.DELETE("/:topic_id", DeleteTopic)
+		}
+	}
+
+	router.Run() // 8080
+}
+```
+
+访问 http://localhost:8080/v1/topics?username=custer&page=1&pagesize=10 可以看到
+
+```json
+{
+    "username": "custer",
+    "page": 1,
+    "pagesize": 10
+}
+```
+
+访问http://localhost:8080/v1/topics?username=custer&pagesize=10 可以看到
+
+`参数错误:Key: 'TopicQuery.Page' Error:Field validation for 'Page' failed on the 'required' tag`
+
 
 
 

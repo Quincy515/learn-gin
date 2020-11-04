@@ -17,7 +17,7 @@ func MustLogin() gin.HandlerFunc {
 	}
 }
 func GetTopicDetail(c *gin.Context) {
-	c.String(200, "获取topicid=%s的帖子", c.Param("topic_id"))
+	c.JSON(200, CreateTopic(101, "帖子标题"))
 }
 
 func NewTopic(c *gin.Context) {
@@ -29,6 +29,14 @@ func DeleteTopic(c *gin.Context) {
 	// 判断登录
 	c.String(200, "删除帖子")
 }
-func GetTopicList() {
 
+// GetTopicList 获取帖子列表
+func GetTopicList(c *gin.Context) {
+	query := TopicQuery{}
+	err := c.BindQuery(&query)
+	if err != nil {
+		c.String(400, "参数错误:%s", err.Error())
+	} else {
+		c.JSON(200, query)
+	}
 }
