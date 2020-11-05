@@ -991,3 +991,170 @@ func main() {
 }
 ```
 
+### 10. 结合Model进行数据映射和查询
+
+文档：https://gorm.io/zh_CN/docs/models.html
+
+创建新表 `topic_class`
+
+<img src="../imgs/09_mysql.png" style="zoom:85%;" />
+
+在 `TopicModel.go` 中创建 mode
+
+```go
+// topic_class
+type TopicCLass struct {
+	ClassId     int 
+	ClassName   string
+	ClassRemark string
+}
+```
+
+查询文档：https://gorm.io/zh_CN/docs/query.html
+
+查询一条数据时对应 `SELECT * FROM users ORDER BY id LIMIT 1;`
+
+```go
+package main
+
+import (
+	"fmt"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	. "topic/src"
+)
+
+func main() {
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	tc := &TopicClass{}
+	db.First(&tc)
+	fmt.Println(tc)
+}
+```
+
+运行报错 
+
+```bash
+2020/11/05 17:09:57 main.go:15 Error 1146: Table 'test.topic_classes' doesn't exist
+[0.000ms] [rows:0] SELECT * FROM `topic_classes` ORDER BY `topic_classes`.`class_id` LIMIT 1
+&{0  }
+```
+
+注意：
+
+> gorm 会对表名 topic_class 自动加复数变为 topic_classes
+
+#### 表明规则
+
+根据 struct 名称改成小写，并且加上复数形式，  譬如 struct 名为
+
+   1）`Test`，对应表名为 `tests`
+
+   2）`TopicClass` ,表名为 `topic_classes` (注意复数，英文基础, ch sh x s 结尾时 加es变复数 )
+
+  对于字段 大家可以发现 `TopicId`，对应的就是字段 `topic_id`
+
+  可以使用配置来 使其不加复数，
+
+```go
+db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+  NamingStrategy: schema.NamingStrategy{
+    TablePrefix: "t_",   // 表名前缀，`User` 的表名应该是 `t_users`
+    SingularTable: true, // 使用单数表名，启用该选项，此时，`User` 的表名应该是 `t_user`
+  },
+})
+```
+
+有时候我们做的是历史项目
+
+表名已经 被固定了。于是我们可以强制指定表名
+
+`db.Table("topic_class").First(&tc)`
+
+#### 指定列名
+
+```go
+// 注意：gorm 会对表名 topic_class 自动加复数变为 topic_classes
+type TopicClass struct {
+	ClassId     int
+	ClassName   string
+	ClassRemark string
+	ClassType   string `gorm:"column:classtype"`
+}
+```
+
+文档：https://gorm.io/zh_CN/docs/models.html
+
+| 标签名         | 说明                                                         |
+| :------------- | :----------------------------------------------------------- |
+| column         | 指定 db 列名                                                 |
+| type           | 列数据类型，推荐使用兼容性好的通用类型，例如：所有数据库都支持 bool、int、uint、float、string、time、bytes 并且可以和其他标签一起使用，例如：`not null`、`size`, `autoIncrement`… 像 `varbinary(8)` 这样指定数据库数据类型也是支持的。在使用指定数据库数据类型时，它需要是完整的数据库数据类型，如：`MEDIUMINT UNSINED not NULL AUTO_INSTREMENT` |
+| size           | 指定列大小，例如：`size:256`                                 |
+| primaryKey     | 指定列为主键                                                 |
+| unique         | 指定列为唯一                                                 |
+| default        | 指定列的默认值                                               |
+| precision      | 指定列的精度                                                 |
+| scale          | 指定列大小                                                   |
+| not null       | 指定列为 NOT NULL                                            |
+| autoIncrement  | 指定列为自动增长                                             |
+| embedded       | 嵌套字段                                                     |
+| embeddedPrefix | 嵌入字段的列名前缀                                           |
+| autoCreateTime | 创建时追踪当前时间，对于 `int` 字段，它会追踪时间戳秒数，您可以使用 `nano`/`milli` 来追踪纳秒、毫秒时间戳，例如：`autoCreateTime:nano` |
+| autoUpdateTime | 创建/更新时追踪当前时间，对于 `int` 字段，它会追踪时间戳秒数，您可以使用 `nano`/`milli` 来追踪纳秒、毫秒时间戳，例如：`autoUpdateTime:milli` |
+| index          | 根据参数创建索引，多个字段使用相同的名称则创建复合索引，查看 [索引](https://gorm.io/zh_CN/docs/indexes.html) 获取详情 |
+| uniqueIndex    | 与 `index` 相同，但创建的是唯一索引                          |
+| check          | 创建检查约束，例如 `check:age > 13`，查看 [约束](https://gorm.io/zh_CN/docs/constraints.html) 获取详情 |
+| <-             | 设置字段写入的权限， `<-:create` 只创建、`<-:update` 只更新、`<-:false` 无写入权限、`<-` 创建和更新权限 |
+| ->             | 设置字段读的权限，`->:false` 无读权限                        |
+| -              | 忽略该字段，`-` 无读写权限                                   |
+
+#### 根据主键检索
+
+```go
+db.First(&user, 10)
+// SELECT * FROM users WHERE id = 10;
+```
+
+```go
+type TopicClass struct {
+	ClassId     int `gorm:"primaryKey"`
+	ClassName   string
+	ClassRemark string
+	ClassType   string `gorm:"column:classtype"`
+}
+```
+
+#### 取出所有数据
+
+```go
+package main
+
+import (
+	"fmt"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	. "topic/src"
+)
+
+func main() {
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	tc := &TopicClass{}
+	db.First(&tc, 2)
+	fmt.Println(tc)
+
+	var tcs []TopicClass
+	db.Find(&tcs)
+	fmt.Println(tcs)
+}
+```
+
+#### Where条件语句
+
+```go
+	db.Where("class_name=?", "技术类").Find(&tcs) // 条件语句
+	db.Find(&tcs, "class_name=?", "新闻类") // 内联条件-用法与 Where 类似
+	db.Where(&TopicClass{ClassName: "技术类"}).Find(&tcs) // Struct
+```
+

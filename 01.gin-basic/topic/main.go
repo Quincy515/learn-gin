@@ -4,19 +4,28 @@ import (
 	"fmt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	. "topic/src"
 )
 
 func main() {
 	// 参考 https://github.com/go-sql-driver/mysql#dsn-data-source-name 获取详情
 	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	rows, _ := db.Raw("SELECT topic_id, topic_title FROM topics").Rows()
-	for rows.Next() {
-		var t_id int
-		var t_title string
-		rows.Scan(&t_id, &t_title)
-		fmt.Println(t_id, t_title)
-	}
+	tc := &TopicClass{}
+	db.First(&tc, 2)
+	fmt.Println(tc)
+
+	var tcs []TopicClass
+	db.Find(&tcs)
+	fmt.Println(tcs)
+
+	db.Where("class_name=?", "技术类").Find(&tcs)
+	fmt.Println(tcs)
+	db.Find(&tcs, "class_name=?", "新闻类")
+	fmt.Println(tcs)
+	db.Where(&TopicClass{ClassName: "技术类"}).Find(&tcs)
+	fmt.Println(tcs)
+
 	//router := gin.Default()
 	//
 	//if v, ok := binding.Validator.Engine().(*validator.Validate); ok {

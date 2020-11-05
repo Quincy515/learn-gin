@@ -27,3 +27,11 @@ type TopicQuery struct {
 	Page     int    `json:"page" form:"page" binding:"required"`
 	PageSize int    `json:"pagesize" form:"pagesize"`
 }
+
+// 注意：gorm 会对表名 topic_class 自动加复数变为 topic_classes
+type TopicClass struct {
+	ClassId     int `gorm:"primaryKey"`
+	ClassName   string
+	ClassRemark string
+	ClassType   string `gorm:"column:classtype"`
+}
