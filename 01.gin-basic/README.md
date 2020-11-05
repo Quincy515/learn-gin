@@ -921,5 +921,73 @@ func main() {
 }
 ```
 
+### 09. 数据库和ORM
 
+要不要用 orm?
+
+<img src="../imgs/06_gorm.png" style="zoom:85%;" />
+
+为了可维护性适当的牺牲一些性能是可以的。
+
+<img src="../imgs/07_gorm.png" style="zoom:85%;" />
+
+MySQL 驱动：https://github.com/go-sql-driver/mysql
+
+Gorm：github地址:  https://github.com/jinzhu/gorm  文档： http://gorm.io/
+
+在项目目录下执行
+
+`go get -u gorm.io/gorm`
+
+` go get -u gorm.io/driver/mysql`
+
+数据库连接
+
+文档地址：https://gorm.io/zh_CN/docs/connecting_to_the_database.html
+
+参数文档：https://github.com/go-sql-driver/mysql#parameters
+
+```go
+import (
+  "gorm.io/driver/mysql"
+  "gorm.io/gorm"
+)
+
+func main() {
+  // 参考 https://github.com/go-sql-driver/mysql#dsn-data-source-name 获取详情
+  dsn := "user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
+  db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+}
+```
+
+新建数据表 `topics`
+
+<img src="../imgs/08_mysql.png" style="zoom:85%;" />
+
+然后随便 插入点数据
+
+使用纯 SQL 语句
+
+```go
+package main
+
+import (
+	"fmt"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+)
+
+func main() {
+	// 参考 https://github.com/go-sql-driver/mysql#dsn-data-source-name 获取详情
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	rows, _ := db.Raw("SELECT topic_id, topic_title FROM topics").Rows()
+	for rows.Next() {
+		var t_id int
+		var t_title string
+		rows.Scan(&t_id, &t_title)
+		fmt.Println(t_id, t_title)
+	}
+}
+```
 
