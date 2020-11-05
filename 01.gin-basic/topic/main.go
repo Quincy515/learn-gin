@@ -12,9 +12,10 @@ func main() {
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("topicurl", TopicUrl)
+		v.RegisterValidation("topics", TopicsValidate) // 自定义验证批量post帖子的长度
 	}
 
-	v1 := router.Group("/v1/topics")
+	v1 := router.Group("/v1/topics") // 单条帖子处理
 	{
 		v1.GET("", GetTopicList)
 
@@ -24,6 +25,14 @@ func main() {
 		{
 			v1.POST("", NewTopic)
 			v1.DELETE("/:topic_id", DeleteTopic)
+		}
+	}
+
+	v2 := router.Group("/v1/mtopics") // 多条帖子处理
+	{
+		v2.Use(MustLogin())
+		{
+			v2.POST("", NewTopics)
 		}
 	}
 

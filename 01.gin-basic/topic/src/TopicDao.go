@@ -20,6 +20,7 @@ func GetTopicDetail(c *gin.Context) {
 	c.JSON(200, CreateTopic(101, "帖子标题"))
 }
 
+// NewTopic 单条帖子新增
 func NewTopic(c *gin.Context) {
 	topic := Topic{}
 	err := c.BindJSON(&topic)
@@ -27,6 +28,17 @@ func NewTopic(c *gin.Context) {
 		c.String(400, "参数错误:%s", err.Error())
 	} else {
 		c.JSON(200, topic)
+	}
+}
+
+// NewTopics 多条帖子批量新增
+func NewTopics(c *gin.Context) {
+	topics := Topics{}
+	err := c.BindJSON(&topics)
+	if err != nil {
+		c.String(400, "参数错误:%s", err.Error())
+	} else {
+		c.JSON(200, topics)
 	}
 }
 

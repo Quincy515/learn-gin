@@ -762,5 +762,164 @@ func TopicUrl(fl validator.FieldLevel) bool {
 
 
 
+### 08. 批量提交帖子数据的验证
+
+之前的 API: POST `/v1/topics`  外加JSON参数，即可进行帖子的新增
+
+这里增加需求，允许提交 **多条帖子**，譬如地址是：POST `/v1/mtopics`
+
+#### 第1步加入路由
+
+```go
+	v2 := router.Group("/v1/mtopics") // 多条帖子处理
+	{
+		v2.Use(MustLogin())
+		{
+			v2.POST("", NewTopics)
+		}
+	}
+```
+
+#### 第2步写 handler 函数
+
+```go
+// Topics 多条帖子实体
+type Topics struct {
+	TopicList     []Topic `json:"topics"`
+	TopicListSize int      `json:"size"`
+}
+
+// NewTopics 多条帖子批量新增
+func NewTopics(c *gin.Context) {
+	topics := Topics{}
+	err := c.BindJSON(&topics)
+	if err != nil {
+		c.String(400, "参数错误:%s", err.Error())
+	} else {
+		c.JSON(200, topics)
+	}
+}
+```
+
+#### 第3步对 POST 数据进行验证
+
+1、TopicList 长度必须大于0 ，否则还有什么意义。且必须小于某个数，否则服务器吃不消
+
+2、TopicList的长度和ListSize必须相等，也算是一个辅助验证手段
+
+#### 测试的 JSON 
+
+```json
+{
+    "topics":[
+        {
+            "title":"abcd",
+            "stitle":"abcde",
+            "ip":"127.0.0.1",
+            "score":7,
+            "url":"aaaa"
+        },
+        {
+            "title":"abcd",
+            "stitle":"abcde",
+            "ip":"127.0.0.1",
+            "score":6,
+            "url":"abcd"
+        }
+    ],
+    "size":2
+}
+```
+
+**Dive 控制验证器进入slice、array、map内部**
+
+验证器要写在 `dive` 之前
+
+```go
+// Topics 多条帖子实体
+type Topics struct {
+	TopicList     []Topic `json:"topics" binding:"gt=0,lt=3,topics,dive"`
+	TopicListSize int     `json:"size"`
+}
+```
+
+修改 `MyValidator.go`
+
+```go
+package src
+
+import (
+	"github.com/go-playground/validator/v10"
+	"regexp"
+)
+
+func TopicsValidate(fl validator.FieldLevel) bool {
+	topics, ok := fl.Top().Interface().(*Topics)
+	if ok && topics.TopicListSize == len(topics.TopicList) {
+		return true
+	}
+	return false
+}
+
+// TopicUrl 自定义字段级别校验方法
+func TopicUrl(fl validator.FieldLevel) bool {
+	// 判断当前传入的 struct 是否是 Topic model
+	_, ok1 := fl.Top().Interface().(*Topic)
+	_, ok2 := fl.Top().Interface().(*Topics)
+	if ok1 || ok2 {
+		getValue := fl.Field().String()
+		if ret, _ := regexp.MatchString("^\\w{4,10}$", getValue); ret {
+			return true
+		}
+	}
+	return false
+}
+```
+
+修改 `main.go` 注册自定义验证函数
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	. "topic/src"
+)
+
+func main() {
+	router := gin.Default()
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("topicurl", TopicUrl)
+		v.RegisterValidation("topics", TopicsValidate) // 自定义验证批量post帖子的长度
+	}
+
+	v1 := router.Group("/v1/topics") // 单条帖子处理
+	{
+		v1.GET("", GetTopicList)
+
+		v1.GET("/:topic_id", GetTopicDetail)
+
+		v1.Use(MustLogin())
+		{
+			v1.POST("", NewTopic)
+			v1.DELETE("/:topic_id", DeleteTopic)
+		}
+	}
+
+	v2 := router.Group("/v1/mtopics") // 多条帖子处理
+	{
+		v2.Use(MustLogin())
+		{
+			v2.POST("", NewTopics)
+		}
+	}
+
+	router.Run() // 8080
+}
+```
+
 
 
