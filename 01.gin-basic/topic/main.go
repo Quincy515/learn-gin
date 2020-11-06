@@ -59,7 +59,7 @@ func main() {
 	{
 		v1.GET("", GetTopicList)
 
-		v1.GET("/:topic_id", GetTopicDetail)
+		v1.GET("/:topic_id", CacheDecorator(GetTopicDetail, "topic_id", "topic_%s", Topic{}))
 
 		v1.Use(MustLogin())
 		{

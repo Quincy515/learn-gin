@@ -1880,5 +1880,71 @@ func GetTopicDetail(c *gin.Context) {
 }
 ```
 
+### 16. 使用"装饰器模式"实现Redis缓存的封装基本套路
 
+#### 使用装饰器函数
+
+```go
+func CacheDecorator(h gin.HandlerFunc) gin.HandlerFunc{
+      return func(context *gin.Context) {
+
+      }
+}
+```
+
+传入一个函数，返回一个函数，在中间过程中进行业务的处理。
+
+在路由部分只要这么写就行了
+
+` v1.GET("/:topic_id",CacheDecorator(GetTopicDetail))`
+
+新建一个装饰器文件 `Decorator.go`
+
+加入一些参数
+
+`func CacheDecorator(h gin.HandlerFunc,param string,redKeyPattern string,empty interface{})`
+
+1、`param` 是获取的参数 `ID`，因为装饰器并不知道获取的ID参数是什么
+
+2、redKeyPattern 是redis中key的格式 ，因为装饰器也并不知道redis存的key是什么形式
+
+3、empty  传入一个空对象，用于转化
+
+```go
+package src
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/gomodule/redigo/redis"
+	"log"
+)
+
+// 缓存装饰器
+func CacheDecorator(h gin.HandlerFunc, parm string, redKeyPattern string, empty interface{}) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		getID := c.Param(parm)                        // 得到 ID 值
+		redisKey := fmt.Sprintf(redKeyPattern, getID) // 拼接 redisKey
+		conn := RedisDefaultPool.Get()                // 获取连接池
+		defer conn.Close()                            // 不是关闭是还给连接池
+		ret, err := redis.Bytes(conn.Do("get", redisKey))
+		if err != nil { // 缓存里没有
+			h(c) // 执行目标方法
+			dbResult, exists := c.Get("dbResult")
+			if !exists {
+				dbResult = empty // 空对象
+			}
+			retData, _ := json.Marshal(dbResult)
+			conn.Do("setex", redisKey, 20, retData)
+			c.JSON(200, dbResult)
+			log.Println("从数据库总读取")
+		} else { // 缓存里有需要获取的数据
+			json.Unmarshal(ret, &empty)
+			c.JSON(200, empty)
+			log.Println("从 redis 读取")
+		}
+	}
+}
+```
 
