@@ -1158,3 +1158,176 @@ func main() {
 	db.Where(&TopicClass{ClassName: "技术类"}).Find(&tcs) // Struct
 ```
 
+### 11. 练习：新增数据、封装DB初步、结合Gin实现查询API
+
+`topics.sql` 数据库表
+
+```sql
+SET FOREIGN_KEY_CHECKS=0;
+
+-- ----------------------------
+-- Table structure for `topics`
+-- ----------------------------
+DROP TABLE IF EXISTS `topics`;
+CREATE TABLE `topics` (
+  `topic_id` int(11) NOT NULL AUTO_INCREMENT,
+  `topic_title` varchar(200) NOT NULL,
+  `topic_short_title` varchar(50) DEFAULT NULL,
+  `user_ip` varchar(20) NOT NULL,
+  `topic_score` int(11) DEFAULT NULL,
+  `topic_url` varchar(200) NOT NULL,
+  `topic_date` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  PRIMARY KEY (`topic_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- Records of topics
+-- ----------------------------
+INSERT INTO `topics` VALUES ('8', 'TopicTitle', 'TopicShortTitle', '127.0.0.1', '0', 'testurl', '2019-03-07 22:01:25');
+```
+
+数据库 `model` 
+
+```go
+// Topic 单个帖子实体
+type Topic struct {
+	TopicID         int       `json:"id" gorm:"primaryKey"`
+	TopicTitle      string    `json:"title" binding:"min=4,max=20"`
+	TopicShortTitle string    `json:"stitle" binding:"required,nefield=TopicTitle"`
+	TopicUrl        string    `json:"url" binding:"omitempty,topicurl"`
+	UserIP          string    `json:"ip" binding:"ipv4"`
+	TopicScore      int       `json:"score" binding:"omitempty,gt=5"`
+	TopicDate       time.Time `json:"topic_date" binding:"required"`
+}
+```
+
+`Topic` 实例化
+
+```go
+topic := Topic{
+		TopicTitle:      "TopicTitle",
+		TopicShortTitle: "TopicShortTitle",
+		UserIP:          "127.0.0.1",
+		TopicScore:      0,
+		TopicUrl:        "testurl",
+		TopicDate:       time.Now()}
+```
+
+#### 新增数据
+
+```
+result := db.Create(&topic) // 通过数据的指针来创建
+
+topic.ID             // 返回插入数据的主键
+result.Error        // 返回 error
+result.RowsAffected // 返回插入记录的条数
+```
+
+#### 结合 gin
+
+GET `/topics/id` 获取 指定 ID 的 值
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	. "topic/src"
+)
+
+func main() {
+	router := gin.Default()
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("topicurl", TopicUrl)
+		v.RegisterValidation("topics", TopicsValidate) // 自定义验证批量post帖子的长度
+	}
+
+	v1 := router.Group("/v1/topics") // 单条帖子处理
+	{
+		v1.GET("", GetTopicList)
+
+		v1.GET("/:topic_id", GetTopicDetail)
+
+		v1.Use(MustLogin())
+		{
+			v1.POST("", NewTopic)
+			v1.DELETE("/:topic_id", DeleteTopic)
+		}
+	}
+
+	v2 := router.Group("/v1/mtopics") // 多条帖子处理
+	{
+		v2.Use(MustLogin())
+		{
+			v2.POST("", NewTopics)
+		}
+	}
+
+	router.Run() // 8080
+}
+```
+
+```go
+func GetTopicDetail(c *gin.Context) {
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	tid := c.Param("topic_id")
+	topics := Topics{}
+	db.Find(&topics, tid)
+	c.JSON(200, topics)
+}
+```
+
+访问 http://localhost:8080/v1/topics/8 可以看到
+
+```json
+{
+    "id": 8,
+    "title": "TopicTitle",
+    "stitle": "TopicShortTitle",
+    "url": "testurl",
+    "ip": "127.0.0.1",
+    "score": 0,
+    "topic_date": "2019-03-07T22:01:25+08:00"
+}
+```
+
+#### 封装数据库初始化
+
+```go
+package src
+
+import (
+	"fmt"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+)
+
+var (
+	DBHelper  *gorm.DB
+	err error
+)
+
+func init() {
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+```
+
+修改获取帖子详情函数
+
+```go
+func GetTopicDetail(c *gin.Context) {
+	tid := c.Param("topic_id")
+	topics := Topic{}
+	DBHelper.Find(&topics, tid)
+	c.JSON(200, topics)
+}
+```
+
