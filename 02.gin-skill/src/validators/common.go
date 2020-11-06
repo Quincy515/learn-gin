@@ -1,6 +1,7 @@
 package validators
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"log"
@@ -13,5 +14,12 @@ func init() {
 		myvalid = v
 	} else {
 		log.Fatal("error validator")
+	}
+}
+
+func registerValidation(tag string, fn validator.Func) {
+	err := myvalid.RegisterValidation(tag, fn)
+	if err != nil {
+		log.Fatal(fmt.Sprintf("validator %s error", tag))
 	}
 }

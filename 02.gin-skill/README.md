@@ -1054,4 +1054,86 @@ func UserSave(c *gin.Context) {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/5fc540f6c3351b31146ea8aef2164cde158d9747#diff-2357d785d351a1c8beb39645ad84efb5d68e67b935ba83881b80a1e329ba2c64L4)
+
+### 12. gin自定义验证(2):进阶封装自定义验证
+
+针对字段的专项验证器
+
+比如针对用户名的规则比较多，有本身 `tag` 的验证，还有自定义的验证。
+
+可以把所有相关用户名验证的相关规则，全部封装到 `UserName` 里面。
+
+在自定义验证规则 `username.go` 文件中修改代码，这样每个字段的自定义验证有专门的文件。
+
+```go
+package validators
+
+import (
+	"github.com/go-playground/validator/v10"
+)
+
+// init 注册自定义验证
+func init() {
+	// tag 规则强制转换为自定义的规则名 UserName
+	registerValidation("UserName", UserName("required,min=4").toFunc())
+}
+
+// UserName 就是规则
+type UserName string // 用户名是 string 类型
+
+// 针对用户名的验证规则
+func (this UserName) toFunc() validator.Func {
+	return func(fl validator.FieldLevel) bool {
+		v, ok := fl.Field().Interface().(string) // 断言
+		if ok {
+			return this.validate(v)
+		}
+		return false
+	}
+}
+
+func (this UserName) validate(v string) bool {
+	// 本身的 tag 验证
+	if err := myvalid.Var(v, string(this)); err != nil { // 单字段验证
+		return false
+	}
+	// 其他自定义验证
+	if len(v) > 8 {
+		return false
+	}
+	return true
+}
+```
+
+注册自定义验证的封装在 `common.go` 文件中。
+
+```go
+package validators
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	"log"
+)
+
+var myvalid *validator.Validate
+
+func init() {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		myvalid = v
+	} else {
+		log.Fatal("error validator")
+	}
+}
+
+func registerValidation(tag string, fn validator.Func) {
+	err := myvalid.RegisterValidation(tag, fn)
+	if err != nil {
+		log.Fatal(fmt.Sprintf("validator %s error", tag))
+	}
+}
+```
+
 代码变动 [git commit]()
