@@ -8,7 +8,9 @@ import (
 func main() {
 	r := gin.New()
 	r.GET("/", func(c *gin.Context) {
-		user := UserModel.New(UserModel.WithUserID(101), UserModel.WithUserName("custer"))
+		user := UserModel.New().
+			Mutate(UserModel.WithUserID(3),
+				UserModel.WithUserName("custer"))
 		c.JSON(200, user)
 	})
 	r.Run(":8080")

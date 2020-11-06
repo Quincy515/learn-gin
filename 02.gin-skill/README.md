@@ -196,7 +196,63 @@ func (this UserModelAttrFuncs) Apply(u *UserModelImpl) {
 
 `user := UserModel.New(UserModel.WithUserID(101), UserModel.WithUserName("custer"))`
 
+### 03. 链式调用
 
+比如 `user := UserModel.New(UserModel.WithUserID(101))`  初始化之后还想修改属性 `user.Set()`
 
+或者 `user := UserModel.New().UserID()` 这样只能修改一个属性，怎么修改多个属性
 
+```go
+package UserModel
+
+type UserModelImpl struct {
+	UserID   int
+	UserName string
+}
+
+// New 初始化实例
+func New(attrs ...UserModelAttrFunc) *UserModelImpl {
+	u := &UserModelImpl{}
+	// 对 u 里每个属性进行初始化
+	// 强制类型转化。
+	UserModelAttrFuncs(attrs).Apply(u)
+	return u
+}
+
+// Mutate 修改实例属性
+func (this *UserModelImpl) Mutate(attrs ...UserModelAttrFunc) *UserModelImpl {
+	UserModelAttrFuncs(attrs).Apply(this)
+	return this
+}
+```
+
+调用
+
+```go
+package main
+
+import (
+   "ginskill/src/models/UserModel"
+   "github.com/gin-gonic/gin"
+)
+
+func main() {
+   r := gin.New()
+   r.GET("/", func(c *gin.Context) {
+      user := UserModel.New().
+         Mutate(UserModel.WithUserID(3)).
+         Mutate(UserModel.WithUserName("custer"))
+      c.JSON(200, user)
+   })
+   r.Run(":8080")
+}
+```
+
+也可以写成这样
+
+```go
+user := UserModel.New().
+   Mutate(UserModel.WithUserID(3),
+      UserModel.WithUserName("custer"))
+```
 
