@@ -6,15 +6,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"time"
 	. "topic/src"
 )
 
-func main() {
+func main2() {
 	count := 0
-	go func() {
+	go func() { // 死循环程序
 		for {
 			fmt.Println("执行", count)
 			count++
@@ -22,35 +24,21 @@ func main() {
 		}
 	}()
 
-	c := make(chan os.Signal)
+	c := make(chan os.Signal) // 1. 创建信号 chan
 	go func() {
+		// 2. 创建一个 超时 context，到期后会执行 Done
 		ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
 		// 中间是业务
 		select {
 		case <-ctx.Done():
-			c <- os.Interrupt // 信号输入
+			c <- os.Interrupt // 3. 重点，超时时间到了会发送 SIGINT 信号
 		}
 	}()
-	signal.Notify(c) //监听所有信号
+	signal.Notify(c) // 4. 监听所有信号
 	s := <-c         // 赋值给变量 s
 	fmt.Println(s)
 }
-func main2() {
-	// 参考 https://github.com/go-sql-driver/mysql#dsn-data-source-name 获取详情
-	//dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
-	//db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	//topic := Topic{
-	//	TopicTitle:      "TopicTitle",
-	//	TopicShortTitle: "TopicShortTitle",
-	//	UserIP:          "127.0.0.1",
-	//	TopicScore:      0,
-	//	TopicUrl:        "testurl",
-	//	TopicDate:       time.Now()}
-	//result := db.Create(&topic)
-	//fmt.Println(topic.TopicID)
-	//fmt.Println(result.Error)
-	//fmt.Println(result.RowsAffected)
-
+func main() {
 	router := gin.Default()
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
@@ -79,5 +67,27 @@ func main2() {
 		}
 	}
 
-	router.Run() // 8080
+	//router.Run() // 8080
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
+	go (func() { // 启动 web 服务
+		err := server.ListenAndServe()
+		if err != nil {
+			log.Fatal("服务器启动失败:", err)
+		}
+	})()
+	go (func() { // 通过协程方式启动数据库
+		InitDB()
+	})()
+	ServerNotify() // 信号监听
+	//这里还可以做一些 释放连接或善后工作，暂时略
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err := server.Shutdown(ctx)
+	if err != nil { // 强制关闭
+		log.Fatalln("服务器关闭")
+	}
+	log.Println("服务器优雅退出")
 }

@@ -1496,7 +1496,7 @@ Process finished with exit code 0
 ```go
 func main() {
 	count := 0
-	go func() {
+	go func() { // 死循环程序
 		for {
 			fmt.Println("执行", count)
 			count++
@@ -1504,16 +1504,17 @@ func main() {
 		}
 	}()
 
-	c := make(chan os.Signal)
+	c := make(chan os.Signal) // 1. 创建信号 chan
 	go func() {
+		// 2. 创建一个 超时 context，到期后会执行 Done
 		ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
 		// 中间是业务
 		select {
 		case <-ctx.Done():
-			c <- os.Interrupt
+			c <- os.Interrupt // 3. 重点，超时时间到了会发送 SIGINT 信号
 		}
 	}()
-	signal.Notify(c) //监听所有信号
+	signal.Notify(c) // 4. 监听所有信号
 	s := <-c         // 赋值给变量 s
 	fmt.Println(s)
 }
@@ -1532,7 +1533,252 @@ interrupt
 Process finished with exit code 0
 ```
 
+### 12. 当数据库连接出错时优雅关闭web服务：两种方式
 
+### 使用 `log.Fatal()`
+
+```go
+package src
+
+import (
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"log"
+	"time"
+)
+
+var (
+	DBHelper *gorm.DB
+	err      error
+)
+
+func init() {
+	dsn := "root:root234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		//fmt.Println(err)
+		log.Fatal("数据库初始化错误：", err)
+	}
+	sqlDB, _ := DBHelper.DB()
+	// SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
+	sqlDB.SetMaxIdleConns(10)
+	// SetMaxOpenConns 设置打开数据库连接的最大数量。
+	sqlDB.SetMaxOpenConns(100)
+	// SetConnMaxLifetime 设置了连接可复用的最大时间。
+	sqlDB.SetConnMaxLifetime(time.Hour)
+}
+```
+
+数据库连接出错会在控制台显示
+
+```bash
+2020/11/06 11:18:14 I:/topic/src/MyDB.go:17
+[error] failed to initialize database, got error Error 1045: Access denied for user 'root'@'localhost' (using password: YES)
+2020/11/06 11:18:14 数据库初始化错误：Error 1045: Access denied for user 'root'@'localhost' (using password: YES)
+
+Process finished with exit code 1
+```
+
+但这样必须是数据库初始化是在其他服务启动之前。
+
+如果不是这样就可以使用第2种方法信号功能来停止服务。
+
+#### 信号传递，来拦截优雅关闭服务
+
+改造`gin` 服务启动代码 `router.Run()` 修改为默认 `http server` 启动
+
+```go
+	//router.Run() // 8080
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
+	err := server.ListenAndServe()
+	if err != nil {
+		log.Fatal("服务器错误:", err)
+		return
+	}
+```
+
+可以把服务启动放入协程里
+
+```go
+    //router.Run() // 8080
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
+	go(func() {
+		err := server.ListenAndServe()
+		if err != nil {
+			log.Fatal("服务器错误:", err)
+			return
+		}
+	})()
+```
+
+新建 `MyInit.go` 文件，包含程序初始化相关内容
+
+```go
+package src
+
+import (
+	"log"
+	"os"
+	"os/signal"
+)
+
+var ServerSigChan chan os.Signal
+
+func init() {
+	ServerSigChan = make(chan os.Signal) // 创建信号 chan
+}
+
+func ShutDownServer(err error) {
+	log.Println(err)
+	ServerSigChan <- os.Interrupt // 发送 SIGINT 信号
+}
+
+func ServerNotify() {
+	signal.Notify(ServerSigChan, os.Interrupt)  // 监听所有信号
+	<-ServerSigChan
+}
+```
+
+修改 `MyDB.go` 文件中数据库初始化出错的处理
+
+```go
+package src
+
+import (
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"time"
+)
+
+var (
+	DBHelper *gorm.DB
+	err      error
+)
+
+func InitDB() {
+	dsn := "root:root234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		//fmt.Println(err)
+		//log.Fatal("数据库初始化错误：", err)
+		ShutDownServer(err)
+		return
+	}
+	sqlDB, _ := DBHelper.DB()
+	// SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
+	sqlDB.SetMaxIdleConns(10)
+	// SetMaxOpenConns 设置打开数据库连接的最大数量。
+	sqlDB.SetMaxOpenConns(100)
+	// SetConnMaxLifetime 设置了连接可复用的最大时间。
+	sqlDB.SetConnMaxLifetime(time.Hour)
+}
+```
+
+服务器优雅退出
+
+```go
+func main() {
+	router := gin.Default()
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("topicurl", TopicUrl)
+		v.RegisterValidation("topics", TopicsValidate) // 自定义验证批量post帖子的长度
+	}
+
+	v1 := router.Group("/v1/topics") // 单条帖子处理
+	{
+		v1.GET("", GetTopicList)
+
+		v1.GET("/:topic_id", GetTopicDetail)
+
+		v1.Use(MustLogin())
+		{
+			v1.POST("", NewTopic)
+			v1.DELETE("/:topic_id", DeleteTopic)
+		}
+	}
+
+	v2 := router.Group("/v1/mtopics") // 多条帖子处理
+	{
+		v2.Use(MustLogin())
+		{
+			v2.POST("", NewTopics)
+		}
+	}
+
+	//router.Run() // 8080
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
+	go (func() { // 启动 web 服务
+		err := server.ListenAndServe()
+		if err != nil {
+			log.Fatal("服务器启动失败:", err)
+		}
+	})()
+	go (func() { // 通过协程方式启动数据库
+		InitDB()
+	})()
+	ServerNotify() // 信号监听
+	//这里还可以做一些 释放连接或善后工作，暂时略
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err := server.Shutdown(ctx)
+	if err != nil { // 强制关闭
+		log.Fatalln("服务器关闭")
+	}
+	log.Println("服务器优雅退出")
+}
+```
+
+参考代码
+
+```go
+	/**
+	服务器重启时对于正在访问网站的用户来说，直接就报服务端异常。
+	优雅关机就是指
+	1. 停止接收新请求
+	2. 等待正在访问网站的用户收到响应后再关机。
+	`net/http` 通过`srv.Shutdown(ctx)`原生支持优雅关机
+	*/
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", viper.GetInt("app.port")),
+		Handler: router,
+	}
+	// 开启一个 goroutine 启动服务
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			zap.L().Fatal("listen: ", zap.Error(err))
+		}
+	}()
+
+	// 等待中断信号来优雅地关闭服务器，为关闭服务器操作设置一个5秒的超时
+	quit := make(chan os.Signal, 1) // 创建一个接收信号的通道
+	// kill 默认会发送 syscall.SIGTERM 信号
+	// kill -2 发送 syscall.SIGINT 信号，我们常用的Ctrl+C就是触发系统SIGINT信号
+	// kill -9 发送 syscall.SIGKILL 信号，但是不能被捕获，所以不需要添加它
+	// signal.Notify把收到的 syscall.SIGINT或syscall.SIGTERM 信号转发给quit
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM) // 此处不会阻塞
+	<-quit                                               // 阻塞在此，当接收到上述两种信号时才会往下执行
+	zap.L().Info("Shutdown Server ...")
+	// 创建一个5秒超时的context
+	// 相当于告诉程序我给你5秒钟的时间你把没完成的请求处理一下，之后我们就要关机啦
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// 5秒内优雅关闭服务（将未处理完的请求处理完再关闭服务），超过5秒就超时退出
+	if err := srv.Shutdown(ctx); err != nil {
+		zap.L().Fatal("Server Shutdown: ", zap.Error(err))
+	}
+
+	zap.L().Info("Server exiting...")
+```
 
 
 

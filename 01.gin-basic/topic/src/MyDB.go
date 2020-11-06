@@ -1,7 +1,6 @@
 package src
 
 import (
-	"fmt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"time"
@@ -12,11 +11,14 @@ var (
 	err      error
 )
 
-func init() {
+func InitDB() {
 	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		fmt.Println(err)
+		//fmt.Println(err)
+		//log.Fatal("数据库初始化错误：", err)
+		ShutDownServer(err)
+		return
 	}
 	sqlDB, _ := DBHelper.DB()
 	// SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
