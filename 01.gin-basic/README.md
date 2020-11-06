@@ -1533,7 +1533,7 @@ interrupt
 Process finished with exit code 0
 ```
 
-### 12. 当数据库连接出错时优雅关闭web服务：两种方式
+### 13. 当数据库连接出错时优雅关闭web服务：两种方式
 
 ### 使用 `log.Fatal()`
 
@@ -1780,9 +1780,53 @@ func main() {
 	zap.L().Info("Server exiting...")
 ```
 
+### 14. 入手redis第三方库、连接池、快速上手
 
+文档：https://github.com/gomodule/redigo
 
+https://godoc.org/github.com/gomodule/redigo/redis#pkg-examples
 
+安装：`go get github.com/gomodule/redigo/redis`
+
+新建文件 `MyRedis.go` 
+
+```go
+package src
+
+import (
+	"github.com/gomodule/redigo/redis"
+	"time"
+)
+
+var RedisDefaultPool *redis.Pool
+
+func newPool(addr string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		// Dial or DialContext must be set. When both are set, DialContext takes precedence over Dial.
+		Dial: func() (redis.Conn, error) { return redis.Dial("tcp", addr) },
+	}
+}
+
+func init() {
+	RedisDefaultPool = newPool("127.0.0.1:6379")
+}
+```
+
+使用 
+
+```go
+func main() {
+	conn := RedisDefaultPool.Get()
+	ret, err := redis.String(conn.Do("get", "name"))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	log.Println(ret)
+}
+```
 
 
 

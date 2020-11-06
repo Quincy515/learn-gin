@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"github.com/gomodule/redigo/redis"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +15,15 @@ import (
 	. "topic/src"
 )
 
+func main() {
+	conn := RedisDefaultPool.Get()
+	ret, err := redis.String(conn.Do("get", "a"))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	log.Println(ret)
+}
 func main2() {
 	count := 0
 	go func() { // 死循环程序
@@ -38,7 +48,7 @@ func main2() {
 	s := <-c         // 赋值给变量 s
 	fmt.Println(s)
 }
-func main() {
+func main1() {
 	router := gin.Default()
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
