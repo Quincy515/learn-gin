@@ -13,5 +13,6 @@ func main() {
 	r := gin.New()
 	r.Use(common.ErrorHandler())
 	r.GET("/users", handlers.UserList)
+	r.GET("/users/:id", handlers.UserDetail)
 	r.Run(":8080")
 }

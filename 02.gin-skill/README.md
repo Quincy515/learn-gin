@@ -855,3 +855,95 @@ func UserList(c *gin.Context) {
 
 代码变动 [git commit]()
 
+### 10. 操作单表查询的代码封装和技巧（2）
+
+获取用户详情 GET `/users/:id` 
+
+#### 第1步：新建路由
+
+```go
+func main() {
+	dbs.InitDB()
+
+	r := gin.New()
+	r.Use(common.ErrorHandler())
+	r.GET("/users", handlers.UserList)
+	r.GET("/users/:id", handlers.UserDetail)
+	r.Run(":8080")
+}
+
+```
+
+#### 第2步：handler 处理函数
+
+```go
+// UserDetail 获取用户详情
+func UserDetail(c *gin.Context) {
+	// id := c.Param("id") 判断
+	// 1. 获取 id
+	id := &struct { // 使用匿名 struct 简化判断
+		ID int `uri:"id" binding:"required,gt=1"`
+	}{}
+	// 2. 绑定
+	result.Result(c.ShouldBindUri(id)).Unwrap() // 如果出错会发生panic然后被中间件捕捉
+	// 3. 取值
+	R(c)(
+		"get_user_detail",
+		"10001",
+		getter.UserGetter.GetUserByID(id.ID).Unwrap(),
+	)(OK)
+}
+```
+
+#### 第3步：获取数据接口
+
+```go
+package getter
+
+import (
+	"fmt"
+	"ginskill/src/dbs"
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+)
+
+// 对外使用的接口
+var UserGetter IUserGetter
+
+func init() {
+	UserGetter = NewUserGetterImpl() // 业务更改，可以更换实现类
+}
+
+// IUserGetter 接口
+type IUserGetter interface {
+	GetUserList() []*UserModel.UserModelImpl // 返回实体列表
+	GetUserByID(id int) *result.ErrorResult
+}
+
+// UserGetterImpl 实现 IUserGetter 接口
+type UserGetterImpl struct{}
+
+// NewUserGetterImpl IUserGetter 接口的实现类
+func NewUserGetterImpl() *UserGetterImpl {
+	return &UserGetterImpl{}
+}
+
+// GetUserList 实现
+func (this *UserGetterImpl) GetUserList() (users []*UserModel.UserModelImpl) {
+	dbs.Orm.Find(&users)
+	return
+}
+
+// GetUserByID 通过 id 获取 user 数据
+func (this *UserGetterImpl) GetUserByID(id int) *result.ErrorResult {
+	user := UserModel.New()
+	db := dbs.Orm.Where("user_id=?", id).Find(user)
+	if db.Error != nil || db.RowsAffected == 0 {
+		return result.Result(nil, fmt.Errorf("not found user, id = %d", id))
+	}
+	return result.Result(user, nil)
+}
+```
+
+
+
