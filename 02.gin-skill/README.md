@@ -605,4 +605,133 @@ func UserList(c *gin.Context) {
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/8341e85c43b8667f4457c74ad950310451a902aa#diff-2357d785d351a1c8beb39645ad84efb5d68e67b935ba83881b80a1e329ba2c64L2)
+
+### 07. JSON输出的封装技巧(2):进阶
+
+当在业务处理中返回出错的 `JSON` 信息时，如下
+
+```go
+package handlers
+
+import (
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+	"github.com/gin-gonic/gin"
+)
+
+func UserList(c *gin.Context) {
+	user := UserModel.New()
+	result.Result(c.ShouldBind(user)).Unwrap()
+	if user.UserID > 10 {
+		OK(c)("user_list", "10000", "user_list")
+	} else {
+		Error(c)("user_list", "10000", "error")
+	}
+}
+```
+
+在 `comment_handler.go` 中可以添加 `Error()` 处理函数
+
+```go
+// Error 返回出错的 JSON 业务
+func Error(c *gin.Context) ResultFunc {
+	return func(message string, code string, result interface{}) {
+		r := ResultPool.Get().(*JSONResult)
+		defer ResultPool.Put(r)
+		r.Message = message
+		r.Code = code
+		r.Result = result
+		c.JSON(400, r)
+	}
+}
+```
+
+上面代码与 `OK()` 函数基本重复，不同的地方在于 `c.JSON(400, r)`
+
+封装
+
+```go
+package handlers
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"sync"
+)
+
+type JSONResult struct {
+	Message string      `json:"message"`
+	Code    string      `json:"code"`
+	Result  interface{} `json:"result"`
+}
+
+func NewJSONResult(message string, code string, result interface{}) *JSONResult {
+	return &JSONResult{Message: message, Code: code, Result: result}
+}
+
+// 每次使用都需要初始化 JSONResult 实例，这个是没有必要的，所以把相关内容放入到 临时对象池
+// 临时对象池
+var ResultPool *sync.Pool
+
+func init() {
+	ResultPool = &sync.Pool{
+		New: func() interface{} {
+			return NewJSONResult("", "", nil)
+		},
+	}
+}
+
+type ResultFunc func(message string, code string, result interface{}) func(output Output)
+type Output func(c *gin.Context, v interface{})
+
+// 定义函数对 {message: "xxx", code: "10001", result: nil} 进行封装
+// R 装饰 ResultFunc，返回 Output 函数
+func R(c *gin.Context) ResultFunc {
+	return func(message string, code string, result interface{}) func(output Output) {
+		r := ResultPool.Get().(*JSONResult)
+		defer ResultPool.Put(r)
+		r.Message = message
+		r.Code = code
+		r.Result = result
+		//c.JSON(200, r)
+		return func(output Output) {
+			output(c, r)
+		}
+	}
+}
+
+func OK(c *gin.Context, v interface{}) {
+	c.JSON(200, v)
+}
+
+func Error(c *gin.Context, v interface{}) {
+	c.JSON(400, v)
+}
+func OK2String(c *gin.Context, v interface{}) {
+	c.String(200, fmt.Sprintf("%v", v))
+}
+```
+
+**对象值的赋值** 和 **输出** 进行了分离
+
+```go
+package handlers
+
+import (
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+	"github.com/gin-gonic/gin"
+)
+
+func UserList(c *gin.Context) {
+	user := UserModel.New()
+	result.Result(c.ShouldBind(user)).Unwrap()
+	if user.UserID > 10 {
+		R(c)("user_list", "10000", "user_list")(OK)
+	} else {
+		R(c)("user_list", "10000", "error")(Error)
+	}
+}
+```
+
