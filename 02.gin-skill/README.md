@@ -95,5 +95,108 @@ func main() {
         └─UserModel
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/4c7bc60999f5ca8330e8f3041f06c1e91c404151#diff-2357d785d351a1c8beb39645ad84efb5d68e67b935ba83881b80a1e329ba2c64R1)
+
+### 02. 实体带参数的初始化技巧
+
+上面目录的好处就是借助包名 `UserModel.New()` 完成初始化，
+
+如果希望对里面的属性进行赋值，有以下几种方式
+
+#### 方案一：重写
+
+```go
+package UserModel
+
+type UserModelImpl struct {
+	UserID   int
+	UserName string
+}
+
+func New() *UserModelImpl {
+	return &UserModelImpl{}
+}
+
+func NewWithID(id int) *UserModelImpl {
+	return &UserModelImpl{UserID: id}
+}
+
+func NewWithName(name string) *UserModelImpl {
+	return &UserModelImpl{UserName: name}
+}
+```
+
+#### 方案二：可变参数
+
+新建 `attrs.go` 文件
+
+```go
+package UserModel
+
+type UserModelAttrFunc func(u *UserModelImpl)
+
+type UserModelAttrFuncs []UserModelAttrFunc
+
+func (this UserModelAttrFuncs) Apply(u *UserModelImpl) {
+	for _, f := range this {
+		f(u)
+	}
+}
+```
+
+然后修改 `model.go` 文件为可变参数
+
+```go
+package UserModel
+
+type UserModelImpl struct {
+	UserID   int
+	UserName string
+}
+
+func New(attrs ...UserModelAttrFunc) *UserModelImpl {
+	u := &UserModelImpl{}
+	// 对 u 里每个属性进行初始化
+	// 强制类型转化。
+	UserModelAttrFuncs(attrs).Apply(u)
+	return u
+}
+```
+
+这样在 `attrs.go` 中就可以对每个属性执行不同的初始化
+
+```go
+package UserModel
+
+type UserModelAttrFunc func(u *UserModelImpl)
+
+type UserModelAttrFuncs []UserModelAttrFunc
+
+func WithUserID(id int) UserModelAttrFunc {
+	return func(u *UserModelImpl) {
+		u.UserID = id
+	}
+}
+func WithUserName(name string) UserModelAttrFunc {
+	return func(u *UserModelImpl) {
+		u.UserName = name
+	}
+}
+
+func (this UserModelAttrFuncs) Apply(u *UserModelImpl) {
+	for _, f := range this {
+		f(u)
+	}
+}
+```
+
+在初始化时 `user := UserModel.New()` 默认为空的初始化，实体实例化
+
+`user := UserModel.New(UserModel.WithUserID(101))`
+
+`user := UserModel.New(UserModel.WithUserID(101), UserModel.WithUserName("custer"))`
+
+
+
+
 
