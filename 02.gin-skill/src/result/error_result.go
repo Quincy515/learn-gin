@@ -1,6 +1,9 @@
 package result
 
-import "fmt"
+import (
+	"fmt"
+	"ginskill/src/validators"
+)
 
 type ErrorResult struct {
 	data interface{}
@@ -9,7 +12,8 @@ type ErrorResult struct {
 
 func (this *ErrorResult) Unwrap() interface{} {
 	if this.err != nil {
-		panic(this.err.Error())
+		validators.CheckErrors(this.err) // 如果匹配到这里就会 panic
+		panic(this.err.Error())          // 没有匹配到继续走这个 panic
 	}
 	return this.data
 }

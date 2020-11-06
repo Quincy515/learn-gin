@@ -1136,4 +1136,114 @@ func registerValidation(tag string, fn validator.Func) {
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/16bc57ef72d26a034a769d90f5e6be7e61f0dfe4#diff-d67aa6c13b62099661bc3de53c44d17c170c00618d34432b6681e8dadf1583e4L1)
+
+### 13. gin自定义验证(3):自定义验证错误信息
+
+可以使用官方提供的方法，也可以使用 `gin` 中间件完成。
+
+在错误拦截的中间件 `error_result.go` 中新增匹配自定义验证失败的错误提示
+
+```go
+func (this *ErrorResult) Unwrap() interface{} {
+	if this.err != nil {
+		validators.CheckErrors(this.err) // 如果匹配到这里就会 panic
+		panic(this.err.Error())          // 没有匹配到继续走这个 panic
+	}
+	return this.data
+}
+```
+
+在 `src/validators/common.go` 中 `CheckErrors` 断言是否是验证错误
+
+```go
+package validators
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	"log"
+)
+
+var myvalid *validator.Validate
+var validatorError map[string]string
+
+func init() {
+	// 包初始化时 make，所以在运行过程中不会增加或减少，所以是线程安全的。
+	validatorError = make(map[string]string)
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		myvalid = v
+	} else {
+		log.Fatal("error validator")
+	}
+}
+
+func registerValidation(tag string, fn validator.Func) {
+	err := myvalid.RegisterValidation(tag, fn)
+	if err != nil {
+		log.Fatal(fmt.Sprintf("validator %s error", tag))
+	}
+}
+
+// CheckErrors 断言是否是验证错误
+func CheckErrors(errors error) {
+	if errs, ok := errors.(validator.ValidationErrors); ok {
+		for _, err := range errs { // 如果是验证错误，看有没有自定义的错误信息
+			if v, exists := validatorError[err.Tag()]; exists {
+				panic(v)
+			}
+		}
+	}
+}
+
+// tagErrMsg 默认的 tag 出错信息
+func tagErrMsg() {
+	validatorError["min"] = "位数太少"
+}
+```
+
+自定义的错误信息
+
+```go
+package validators
+
+import (
+	"github.com/go-playground/validator/v10"
+)
+
+// init 注册自定义验证
+func init() {
+  tagErrMsg()
+	// tag 规则强制转换为自定义的规则名 UserName
+	registerValidation("UserName", UserName("required,min=4").toFunc())
+}
+
+// UserName 就是规则
+type UserName string // 用户名是 string 类型
+
+// 针对用户名的验证规则
+func (this UserName) toFunc() validator.Func {
+	validatorError["UserName"] = "用户名必须在4-8位之间" // 自定义出错信息
+	return func(fl validator.FieldLevel) bool {
+		v, ok := fl.Field().Interface().(string) // 断言
+		if ok {
+			return this.validate(v)
+		}
+		return false
+	}
+}
+
+func (this UserName) validate(v string) bool {
+	// 本身的 tag 验证
+	if err := myvalid.Var(v, string(this)); err != nil { // 单字段验证
+		return false
+	}
+	// 其他自定义验证
+	if len(v) > 8 {
+		return false
+	}
+	return true
+}
+```
+

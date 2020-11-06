@@ -6,6 +6,7 @@ import (
 
 // init 注册自定义验证
 func init() {
+	tagErrMsg()
 	// tag 规则强制转换为自定义的规则名 UserName
 	registerValidation("UserName", UserName("required,min=4").toFunc())
 }
@@ -15,6 +16,7 @@ type UserName string // 用户名是 string 类型
 
 // 针对用户名的验证规则
 func (this UserName) toFunc() validator.Func {
+	validatorError["UserName"] = "用户名必须在4-8位之间" // 自定义出错信息
 	return func(fl validator.FieldLevel) bool {
 		v, ok := fl.Field().Interface().(string) // 断言
 		if ok {
