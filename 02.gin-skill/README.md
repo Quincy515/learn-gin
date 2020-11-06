@@ -256,3 +256,133 @@ user := UserModel.New().
       UserModel.WithUserName("custer"))
 ```
 
+### 04. 参数验证和error处理:基本方法
+
+修改模型 `model.go` 提交参数时表单的 `form` 是 `name`
+
+```go
+type UserModelImpl struct {
+	UserID   int `json:"id"`
+	UserName string `json:"name" form:"name" binding:"min=4"`
+}
+```
+
+基本使用
+
+```go
+package main
+
+import (
+	"ginskill/src/models/UserModel"
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.New()
+	r.POST("/", func(c *gin.Context) {
+		user := UserModel.New()
+		if err := c.ShouldBind(user); err != nil {
+			c.JSON(400, gin.H{"message": err.Error()})
+		} else {
+			c.JSON(200, user)
+		}
+	})
+	r.Run(":8080")
+}
+```
+
+#### 封装错误返回中间件
+
+在 `src` 目录下新建 `common` 文件夹，并新建 `middlewares.go` 文件
+
+```go
+package common
+
+import "github.com/gin-gonic/gin"
+
+// ErrorHandler 错误处理中间件
+func ErrorHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if e := recover(); e != nil {
+				c.JSON(400, gin.H{"message": e})
+			}
+		}()
+		c.Next()
+	}
+}
+```
+
+在 `main` 中使用中间件
+
+```go
+package main
+
+import (
+	"ginskill/src/common"
+	"ginskill/src/models/UserModel"
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.New()
+	r.Use(common.ErrorHandler())
+	r.POST("/", func(c *gin.Context) {
+		user := UserModel.New()
+		if err := c.ShouldBind(user); err != nil {
+			panic(err.Error())
+		} else {
+			c.JSON(200, user)
+		}
+	})
+	r.Run(":8080")
+}
+```
+
+#### 封装整个错误处理
+
+新建文件夹 `result` , 新建文件`error_result.go`
+
+```go
+package result
+
+type ErrorResult struct {
+	err error
+}
+
+func (this *ErrorResult) Unwrap() interface{} {
+	if this.err != nil {
+		panic(this.err.Error())
+	}
+	return nil
+}
+
+func Result(err error) *ErrorResult {
+	return &ErrorResult{err: err}
+}
+```
+
+在 `main.go` 中就可以使用
+
+```go
+package main
+
+import (
+	"ginskill/src/common"
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.New()
+	r.Use(common.ErrorHandler())
+	r.POST("/", func(c *gin.Context) {
+		user := UserModel.New()
+		result.Result(c.ShouldBind(user)).Unwrap()
+		c.JSON(200, user)
+	})
+	r.Run(":8080")
+}
+```
+
