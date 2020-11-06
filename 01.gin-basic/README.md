@@ -222,6 +222,8 @@ func main() {
 
 获取参数可以使用 `c.Query()` , 没有就返回为空，可以使用 `c.DefaultQuery("abc", 1)` 设置默认返回值。
 
+代码变动 [git-commit](https://github.com/custer-go/learn-gin/commit/a641100656ee461f3319cc942019e3533b2da4f8#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9R1)
+
 ### 03.是否要用 MVC 模式？
 
 <img src="../imgs/01_mvc.png" style="zoom:75%;" />
@@ -293,6 +295,8 @@ func main() {
 	router.Run() // 8080
 }
 ```
+
+代码变动 [git-commit](https://github.com/custer-go/learn-gin/commit/542203f61310bc601bb115c55e4bcf8cd9025e44)
 
 ### 04. 简单 Dao 层代码封装
 
@@ -436,6 +440,8 @@ func main() {
 - 访问 POST 请求 http://localhost:8080/v1/topics?token=123 可以看到 `新增帖子`
 - 访问 DELETE 请求 http://localhost:8080/v1/topics/101?token=123 可以看到 `删除帖子`
 
+代码变动 [git-commit](https://github.com/custer-go/learn-gin/commit/88ad9d378a7d586f35a9ceaf5ff92d60599b4636#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L2)
+
 ### 05. 创建Model
 
 创建帖子 model 文件 `TopicModel.go`
@@ -562,6 +568,8 @@ func main() {
 
 `参数错误:Key: 'TopicQuery.Page' Error:Field validation for 'Page' failed on the 'required' tag`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/1ab8bd84670e5c8db95b517606fae0d107e235ff#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L10)
+
 ### 06. 内置验证器的初步使用
 
 实现新增帖子
@@ -625,6 +633,8 @@ type Topic struct {
 	TopicScore      int    `json:"score" binding:"omitempty,gt=5"`
 }
 ```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/83be994338d19e1ddc195486b61ea786775109ba)
 
 ### 07. 自定义验证器结合正则验证JSON参数
 
@@ -760,7 +770,7 @@ func TopicUrl(fl validator.FieldLevel) bool {
 
 <img src="../imgs/05_regexp.png" style="zoom:75%;" />
 
-
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/a503eaa9075eaea0fe43f5d2605aa2993ca72b4f#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L2)
 
 ### 08. 批量提交帖子数据的验证
 
@@ -921,6 +931,8 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/ab8a5584a561e8d1c0df51d3a8276d1df8eecc5d#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L12)
+
 ### 09. 数据库和ORM
 
 要不要用 orm?
@@ -990,6 +1002,8 @@ func main() {
 	}
 }
 ```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/81b89894fc5bc885d333673e5809b5e2801272a4#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L1)
 
 ### 10. 结合Model进行数据映射和查询
 
@@ -1157,6 +1171,8 @@ func main() {
 	db.Find(&tcs, "class_name=?", "新闻类") // 内联条件-用法与 Where 类似
 	db.Where(&TopicClass{ClassName: "技术类"}).Find(&tcs) // Struct
 ```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/a661360f5b209939075cd0c6d8e14cccb9228660#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L4)
 
 ### 11. 练习：新增数据、封装DB初步、结合Gin实现查询API
 
@@ -1330,6 +1346,8 @@ func GetTopicDetail(c *gin.Context) {
 	c.JSON(200, topics)
 }
 ```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/a2eea0707de108df414c2c6c03a8bbbb25f04c4c#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L1)
 
 ### 12. 简单连接池设置、信号处理、优雅的退出程序
 
@@ -1532,6 +1550,8 @@ interrupt
 
 Process finished with exit code 0
 ```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/193ba5dfa51305a8788a9f1f2d131d29056be541#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L1)
 
 ### 13. 当数据库连接出错时优雅关闭web服务：两种方式
 
@@ -1780,6 +1800,8 @@ func main() {
 	zap.L().Info("Server exiting...")
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/917a316542f47d1b37eb64303c0182e06d2e6277#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L6)
+
 ### 14. 入手redis第三方库、连接池、快速上手
 
 文档：https://github.com/gomodule/redigo
@@ -1827,6 +1849,8 @@ func main() {
 	log.Println(ret)
 }
 ```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/b7c07362a524d11653f9eec3da47bee32954f5bf#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L6)
 
 ### 15. 结合gin实现基本的redis缓存、缓存穿透简单处理 
 
@@ -1879,6 +1903,8 @@ func GetTopicDetail(c *gin.Context) {
 	}
 }
 ```
+
+代码变动 [git commit ](https://github.com/custer-go/learn-gin/commit/987afde79a00236b238a57d43c4adf44c8cb70d0#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L6)
 
 ### 16. 使用"装饰器模式"实现Redis缓存的封装基本套路
 
@@ -1948,3 +1974,4 @@ func CacheDecorator(h gin.HandlerFunc, parm string, redKeyPattern string, empty 
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/3c51d390a2d805736fd6deaf4f9457ccbb1db762#diff-933c81a38200eacdd5d91c6a777a9b18a3b660de4c04a8f656be96ba37a7dce9L59)
