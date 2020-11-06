@@ -196,6 +196,8 @@ func (this UserModelAttrFuncs) Apply(u *UserModelImpl) {
 
 `user := UserModel.New(UserModel.WithUserID(101), UserModel.WithUserName("custer"))`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/d5e05d62292d7ebbf732acd25c40a9470785d719#diff-2357d785d351a1c8beb39645ad84efb5d68e67b935ba83881b80a1e329ba2c64L8)
+
 ### 03. 链式调用
 
 比如 `user := UserModel.New(UserModel.WithUserID(101))`  初始化之后还想修改属性 `user.Set()`
@@ -255,6 +257,8 @@ user := UserModel.New().
    Mutate(UserModel.WithUserID(3),
       UserModel.WithUserName("custer"))
 ```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/6e55e5f9240b2f3b94a17539d1e6f7b341698b08#diff-2357d785d351a1c8beb39645ad84efb5d68e67b935ba83881b80a1e329ba2c64L8)
 
 ### 04. 参数验证和error处理:基本方法
 
@@ -339,7 +343,7 @@ func main() {
 }
 ```
 
-#### 封装整个错误处理
+#### 封装单返回值的错误处理
 
 新建文件夹 `result` , 新建文件`error_result.go`
 
@@ -386,3 +390,105 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/7e59ef32fcc5aabeac308e16538b8dcaa484da0f#diff-2357d785d351a1c8beb39645ad84efb5d68e67b935ba83881b80a1e329ba2c64L1)
+
+### 05. error处理技巧(2):支持多返回值
+
+先定义一个 `test/test.go` 文件，返回两个值
+
+```go
+package test
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+)
+
+func GetInfo(id int) (gin.H, error) {
+	if id > 10 {
+		return gin.H{"message": "test"}, nil
+	} else {
+		return nil, fmt.Errorf("test error")
+	}
+}
+```
+
+修改错误的封装 `error_result.go` 支持两个返回值
+
+```go
+package result
+
+import "fmt"
+
+type ErrorResult struct {
+	data interface{}
+	err  error
+}
+
+func (this *ErrorResult) Unwrap() interface{} {
+	if this.err != nil {
+		panic(this.err.Error())
+	}
+	return this.data
+}
+
+func Result(vs ...interface{}) *ErrorResult {
+	if len(vs) == 1 {
+		if vs[0] == nil {
+			return &ErrorResult{nil, nil}
+		}
+		if e, ok := vs[0].(error); ok {
+			return &ErrorResult{nil, e}
+		}
+	}
+	if len(vs) == 2 {
+		if vs[1] == nil {
+			return &ErrorResult{vs[0], nil}
+		}
+		if e, ok := vs[1].(error); ok {
+			return &ErrorResult{vs[0], e}
+		}
+	}
+	return &ErrorResult{nil, fmt.Errorf("error result format")}
+}
+```
+
+修改 `main.go` 进行测试
+
+```go
+package main
+
+import (
+	"ginskill/src/common"
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+	"ginskill/src/test"
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.New()
+	r.Use(common.ErrorHandler())
+	r.POST("/", func(c *gin.Context) {
+		user := UserModel.New()
+		result.Result(c.ShouldBind(user)).Unwrap()
+		c.JSON(200, result.Result(test.GetInfo(user.UserID)).Unwrap())
+	})
+	r.Run(":8080")
+}
+```
+
+在测试页面提交 POST 请求，
+
+<img src="../imgs/11_post.png" style="zoom:85%;" />
+
+注意提交 `id` 参数，要在 `model.go` 中修改
+
+```go
+type UserModelImpl struct {
+	UserID   int `json:"id" form:"id"`
+	UserName string `json:"name" form:"name" binding:"min=4"`
+}
+```
+
+代码变动 [git commit]()
