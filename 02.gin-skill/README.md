@@ -775,3 +775,83 @@ func gormDB() *gorm.DB {
 }
 ```
 
+实体名和表明没有关联关系
+
+```go
+package UserModel
+
+type UserModelImpl struct {
+	UserID   int    `json:"id" form:"id"`
+	UserName string `json:"name" form:"name" binding:"min=4"`
+}
+
+func (*UserModelImpl) TableName() string {
+	return "users"
+}
+```
+
+### 09. 操作单表查询的代码封装和技巧(1)
+
+创建文件夹 `data` 所有数据从这个文件夹中取，在 `data` 下新建文件夹 `getter` 表示取数据。
+
+在 `src/data/getter` 目录下新建 `user_getter.go` 文件，表示获取用户相关数据。
+
+```go
+package getter
+
+import (
+	"ginskill/src/dbs"
+	"ginskill/src/models/UserModel"
+)
+
+// 对外使用的接口
+var UserGetter IUserGetter
+
+func init() {
+	UserGetter = NewUserGetterImpl() // 业务更改，可以更换实现类
+}
+
+// IUserGetter 接口
+type IUserGetter interface {
+	GetUserList() []*UserModel.UserModelImpl // 返回实体列表
+}
+
+// UserGetterImpl 实现 IUserGetter 接口
+type UserGetterImpl struct{}
+
+// NewUserGetterImpl IUserGetter 接口的实现类
+func NewUserGetterImpl() *UserGetterImpl {
+	return &UserGetterImpl{}
+}
+
+// GetUserList 实现
+func (this *UserGetterImpl) GetUserList() (users []*UserModel.UserModelImpl) {
+	dbs.Orm.Find(&users)
+	return
+}
+
+```
+
+这样实现方式变动了也没有关系，因为这里一律操作的都是接口。
+
+在 `user_handler.go` 中调用
+
+```go
+package handlers
+
+import (
+	"ginskill/src/data/getter"
+	"github.com/gin-gonic/gin"
+)
+
+func UserList(c *gin.Context) {
+	R(c)(
+		"get_user_list",
+		"10001",
+		getter.UserGetter.GetUserList(),
+	)(OK)
+}
+```
+
+代码变动 [git commit]()
+
