@@ -1331,3 +1331,216 @@ func GetTopicDetail(c *gin.Context) {
 }
 ```
 
+### 12. 简单连接池设置、信号处理、优雅的退出程序
+
+#### 设置连接器基本参数
+
+文档：https://gorm.io/zh_CN/docs/generic_interface.html
+
+GORM 提供了 `DB` 方法，可用于从当前 `*gorm.DB` 返回一个通用的数据库接口 [*sql.DB](https://pkg.go.dev/database/sql#DB)
+
+```go
+// 获取通用数据库对象 sql.DB，然后使用其提供的功能
+sqlDB, err := db.DB()
+sqlDB.Ping() // Ping
+sqlDB.Close() // Close
+sqlDB.Stats() // 返回数据库统计信息
+```
+
+连接池
+
+```go
+// 获取通用数据库对象 sql.DB ，然后使用其提供的功能
+sqlDB, err := db.DB()
+
+// SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
+sqlDB.SetMaxIdleConns(10)
+
+// SetMaxOpenConns 设置打开数据库连接的最大数量。
+sqlDB.SetMaxOpenConns(100)
+
+// SetConnMaxLifetime 设置了连接可复用的最大时间。
+sqlDB.SetConnMaxLifetime(time.Hour)
+```
+
+修改数据库连接
+
+```go
+package src
+
+import (
+	"fmt"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"time"
+)
+
+var (
+	DBHelper *gorm.DB
+	err      error
+)
+
+func init() {
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		fmt.Println(err)
+	}
+	sqlDB, _ := DBHelper.DB()
+	// SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
+	sqlDB.SetMaxIdleConns(10)
+	// SetMaxOpenConns 设置打开数据库连接的最大数量。
+	sqlDB.SetMaxOpenConns(100)
+	// SetConnMaxLifetime 设置了连接可复用的最大时间。
+	sqlDB.SetConnMaxLifetime(time.Hour)
+}
+```
+
+#### 优雅的退出程序
+
+死循环程序
+
+```go
+func main() {
+	count:=0
+	for {
+		fmt.Println("执行",count)
+		count++
+		time.Sleep(time.Second*1)
+	}
+}
+```
+
+使用goland的停止按钮时控制台会显示
+
+```bash
+GOROOT=C:\Go #gosetup
+GOPATH=C:\Users\pc\go #gosetup
+C:\Go\bin\go.exe build -o C:\Users\pc\AppData\Local\Temp\___go_build_topic.exe topic #gosetup
+C:\Users\pc\AppData\Local\Temp\___go_build_topic.exe #gosetup
+执行 0
+执行 1
+执行 2
+执行 3
+执行 4
+
+Process finished with exit code 2
+```
+
+#### 常见的信号
+
+<img src="../imgs/10_singal.png" style="zoom:80%;" />
+
+当我们按ctrl+c时，会发出 `SIGINT` (值是2），默认就是进程终止
+
+
+其他类似
+
+`SIGTERM` ：kill命令的默认信号 （信号值是15， 也就是通常的kill -15进程id）
+
+`SIGILL`  : `kill -9` 表示强制退出
+
+`SIGQUIT` ：建立CORE文件终止进程，并且生成core文件
+
+```go
+func main() {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt) // 监听 15 的信号，不写就监听所有信号
+	s := <-c                       // 赋值给变量 s
+	fmt.Println(s)
+}
+```
+
+使用goland的停止按钮时控制台会显示
+
+```bash
+interrupt
+
+Process finished with exit code 0
+```
+
+程序每秒执行输出显示
+
+```go
+func main() {
+	count := 0
+	go func() {
+		for {
+			fmt.Println("执行", count)
+			count++
+			time.Sleep(time.Second * 1)
+		}
+	}()
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt) // 监听 15 的信号，不写就监听所有信号
+	s := <-c                       // 赋值给变量 s
+	fmt.Println(s)
+}
+```
+
+使用goland的停止按钮时控制台会显示
+
+```bash
+执行 0
+执行 1
+执行 2
+执行 3
+interrupt
+
+Process finished with exit code 0
+```
+
+发送信号，自动停止程序运行
+
+```go
+func main() {
+	count := 0
+	go func() {
+		for {
+			fmt.Println("执行", count)
+			count++
+			time.Sleep(time.Second * 1)
+		}
+	}()
+
+	c := make(chan os.Signal)
+	go func() {
+		ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
+		// 中间是业务
+		select {
+		case <-ctx.Done():
+			c <- os.Interrupt
+		}
+	}()
+	signal.Notify(c) //监听所有信号
+	s := <-c         // 赋值给变量 s
+	fmt.Println(s)
+}
+```
+
+5秒后程序自动停止，可以看到控制台
+
+```go
+执行 0
+执行 1
+执行 2
+执行 3
+执行 4
+interrupt
+
+Process finished with exit code 0
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

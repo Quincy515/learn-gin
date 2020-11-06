@@ -1,13 +1,41 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"os"
+	"os/signal"
+	"time"
 	. "topic/src"
 )
 
 func main() {
+	count := 0
+	go func() {
+		for {
+			fmt.Println("执行", count)
+			count++
+			time.Sleep(time.Second * 1)
+		}
+	}()
+
+	c := make(chan os.Signal)
+	go func() {
+		ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
+		// 中间是业务
+		select {
+		case <-ctx.Done():
+			c <- os.Interrupt // 信号输入
+		}
+	}()
+	signal.Notify(c) //监听所有信号
+	s := <-c         // 赋值给变量 s
+	fmt.Println(s)
+}
+func main2() {
 	// 参考 https://github.com/go-sql-driver/mysql#dsn-data-source-name 获取详情
 	//dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	//db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
