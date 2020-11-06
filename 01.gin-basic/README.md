@@ -1828,9 +1828,57 @@ func main() {
 }
 ```
 
+### 15. 结合gin实现基本的redis缓存、缓存穿透简单处理 
 
+实现缓存
 
+实现的一个 `API` 是 GET `/topic/8`   代表获取 `ID=8` 的帖子
 
+最基本最简单的缓存是
+
+   1、根据 ID 查看数据库是否有值，如果有则取 redis 的内容并返回
+
+   2、如果没有，则从数据库取 。取出来后 放入 redis 缓存，并设置过期时间
+
+之前的代码获取贴子详情
+
+```go
+func GetTopicDetail(c *gin.Context) {
+	tid := c.Param("topic_id")
+	topics := Topic{}
+	DBHelper.Find(&topics, tid)
+	c.JSON(200, topics)
+}
+```
+
+修改成从缓存中读取
+
+```go
+func GetTopicDetail(c *gin.Context) {
+	tid := c.Param("topic_id")
+	topics := Topic{}
+	//DBHelper.Find(&topics, tid)
+	conn := RedisDefaultPool.Get() // 获取连接池
+	defer conn.Close()             // 不是关闭是还给连接池
+	redisKey := "topic_" + tid
+	ret, err := redis.Bytes(conn.Do("get", redisKey))
+	if err != nil { // 缓存里没有
+		DBHelper.Find(&topics, tid)
+		retData, _ := json.Marshal(topics)
+		if topics.TopicID == 0 { // 表示从数据库没有匹配到
+			conn.Do("setex", redisKey, 20, retData)
+		} else { // 正常数据，50秒缓存
+			conn.Do("setex", redisKey, 50, retData)
+		}
+		c.JSON(200, topics)
+		log.Println("从数据库总读取")
+	} else {
+		json.Unmarshal(ret, &topics)
+		c.JSON(200, topics)
+		log.Println("从 redis 读取")
+	}
+}
+```
 
 
 
