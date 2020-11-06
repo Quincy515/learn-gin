@@ -492,3 +492,117 @@ type UserModelImpl struct {
 ```
 
 代码变动 [git commit]()
+
+### 06. JSON输出的封装技巧
+
+模型验证 `result.Result(c.ShouldBind(user)).Unwrap()` 如果有错误就会被中间件处理 `r.Use(common.ErrorHandler())`，没有错误就返回 JSON `c.JSON(200, result.Result(test.GetInfo(user.UserID)).Unwrap())`
+
+#### 封装 controller 控制器
+
+在 `src` 目录下新建文件夹 `handlers` ，新建函数 `user_handler.go` 文件
+
+```go
+package handlers
+
+import (
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+	"ginskill/src/test"
+	"github.com/gin-gonic/gin"
+)
+
+func UserList(c *gin.Context) {
+	user := UserModel.New()
+	result.Result(c.ShouldBind(user)).Unwrap()
+	c.JSON(200, result.Result(test.GetInfo(user.UserID)).Unwrap())
+}
+```
+
+修改 `main.go` 文件
+
+```go
+package main
+
+import (
+	"ginskill/src/common"
+	"ginskill/src/handlers"
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.New()
+	r.Use(common.ErrorHandler())
+	r.POST("/users", handlers.UserList)
+	r.Run(":8080")
+}
+```
+
+#### 封装 JSON 输出
+
+新建一个 `common_handler.go` 文件
+
+```go
+package handlers
+
+import (
+	"github.com/gin-gonic/gin"
+	"sync"
+)
+
+type JSONResult struct {
+	Message string      `json:"message"`
+	Code    string      `json:"code"`
+	Result  interface{} `json:"result"`
+}
+
+func NewJSONResult(message string, code string, result interface{}) *JSONResult {
+	return &JSONResult{Message: message, Code: code, Result: result}
+}
+
+// 每次使用都需要初始化 JSONResult 实例，这个是没有必要的，所以把相关内容放入到 临时对象池
+// 临时对象池
+var ResultPool *sync.Pool
+
+func init() {
+	ResultPool = &sync.Pool{
+		New: func() interface{} {
+			return NewJSONResult("", "", nil)
+		},
+	}
+}
+
+type ResultFunc func(message string, code string, result interface{})
+
+// 定义函数对 {message: "xxx", code: "10001", result: nil} 进行封装
+func OK(c *gin.Context) ResultFunc {
+	return func(message string, code string, result interface{}) {
+		r := ResultPool.Get().(*JSONResult)
+		defer ResultPool.Put(r)
+		r.Message = message
+		r.Code = code
+		r.Result = result
+		c.JSON(200, r)
+	}
+}
+```
+
+在 `user_handler.go` 中使用
+
+```go
+package handlers
+
+import (
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+	"ginskill/src/test"
+	"github.com/gin-gonic/gin"
+)
+
+func UserList(c *gin.Context) {
+	user := UserModel.New()
+	result.Result(c.ShouldBind(user)).Unwrap()
+	OK(c)("user_list", "10000", result.Result(test.GetInfo(user.UserID)).Unwrap())
+}
+```
+
+代码变动 [git commit]()
