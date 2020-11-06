@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"ginskill/src/data/getter"
+	"ginskill/src/models/UserModel"
 	"ginskill/src/result"
 	"github.com/gin-gonic/gin"
 )
@@ -28,5 +29,15 @@ func UserDetail(c *gin.Context) {
 		"get_user_detail",
 		"10001",
 		getter.UserGetter.GetUserByID(id.ID).Unwrap(),
+	)(OK)
+}
+
+func UserSave(c *gin.Context) {
+	u := UserModel.New()
+	result.Result(c.ShouldBindJSON(u)).Unwrap()
+	R(c)(
+		"save_user",
+		"10001",
+		"true",
 	)(OK)
 }

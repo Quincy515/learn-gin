@@ -853,7 +853,7 @@ func UserList(c *gin.Context) {
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/f418601fe5c49ba8abbf37cf5d3f83bc46cf97ea#diff-2357d785d351a1c8beb39645ad84efb5d68e67b935ba83881b80a1e329ba2c64L3)
 
 ### 10. 操作单表查询的代码封装和技巧（2）
 
@@ -945,5 +945,113 @@ func (this *UserGetterImpl) GetUserByID(id int) *result.ErrorResult {
 }
 ```
 
+代码变动 [git commit ](https://github.com/custer-go/learn-gin/commit/58e631a8c5549eb0cc5629dc1750ef741e678618#diff-2357d785d351a1c8beb39645ad84efb5d68e67b935ba83881b80a1e329ba2c64L13)
 
+### 11. gin自定义验证(1):基本写法
 
+查看在 [gin-basic 中的自定义验证函数 topicurl](https://github.com/custer-go/learn-gin/tree/main/01.gin-basic#07-%E8%87%AA%E5%AE%9A%E4%B9%89%E9%AA%8C%E8%AF%81%E5%99%A8%E7%BB%93%E5%90%88%E6%AD%A3%E5%88%99%E9%AA%8C%E8%AF%81json%E5%8F%82%E6%95%B0)
+
+修改用户模型 `UserModelImpl`
+
+```go
+type UserModelImpl struct {
+	UserID      int    `json:"id" form:"id"`
+	UserName    string `json:"name" form:"name" binding:"required,UserName"`
+	UserPwd     string `json:"user_pwd" binding:"required,min=4"`
+	UserAddtime string `json:"addtime"`
+}
+```
+
+自定义验证，比如是专门针对用户名做的一些验证规则，把他们写入专门的自定义函数里面
+
+官方文档的自定义验证： https://github.com/gin-gonic/gin#custom-validators
+
+在 `src` 目录下新建文件夹 `validators` 放所有的验证。
+
+新建文件 `common.go`
+
+```go
+package validators
+
+import (
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	"log"
+)
+
+var myvalid *validator.Validate
+
+func init() {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		myvalid = v
+	} else {
+		log.Fatal("error validator")
+	}
+}
+```
+
+在包内使用，比如在 `username.go` 文件中自定义验证
+
+```go
+package validators
+
+import (
+	"github.com/go-playground/validator/v10"
+	"log"
+)
+
+func init() {
+	if err := myvalid.RegisterValidation("UserName", VUserName); err != nil {
+		log.Fatal("validator UserName error")
+	}
+}
+
+var VUserName validator.Func = func(fl validator.FieldLevel) bool {
+	uname, ok := fl.Field().Interface().(string) // 断言
+	if ok && len(uname) >= 4 {
+		return true
+	}
+	return false // true 表示验证通过，false 表示验证不通过
+}
+```
+
+在 `main.go` 中引用新建的 `validator` 包，初始化 `init` 函数，注册自定义的验证函数。
+
+```go
+package main
+
+import (
+	"ginskill/src/common"
+	"ginskill/src/dbs"
+	"ginskill/src/handlers"
+	_ "ginskill/src/validators" // 不调用，仅引用，执行 init 函数即可
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	dbs.InitDB()
+
+	r := gin.New()
+	r.Use(common.ErrorHandler())
+	r.GET("/users", handlers.UserList)
+	r.GET("/users/:id", handlers.UserDetail)
+	r.POST("/users", handlers.UserSave)
+	r.Run(":8080")
+}
+```
+
+处理保存的逻辑`UserSave()`
+
+```go
+func UserSave(c *gin.Context) {
+	u := UserModel.New()
+	result.Result(c.ShouldBindJSON(u)).Unwrap()
+	R(c)(
+		"save_user",
+		"10001",
+		"true",
+	)(OK)
+}
+```
+
+代码变动 [git commit]()
