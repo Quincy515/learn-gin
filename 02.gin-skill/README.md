@@ -1247,3 +1247,158 @@ func (this UserName) validate(v string) bool {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/3280b06c33c1206a51ca831d5e583abc2c931ce0#diff-1b4ce57cb768ca202c0a42ede0c0f70ea0abaeb68b8a212e951e3a595965b03dL1)
+
+### 14. DB查询技巧(1):使用SQL拼装工具
+
+之前使用的 `gorm` 语句 `dbs.Orm.Find(&users)`，这里使用 `SQL` 拼接工具，把代码重构下。
+
+好处是 1. 复杂 `SQL` 可以直接使用原生，2. `orm` 更换不需要大的改动。
+
+第三方库地址: https://github.com/Masterminds/squirrel
+
+`go get -u github.com/Masterminds/squirrel` 
+
+新建个测试文件 `test.go` 来看下基本使用
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/Masterminds/squirrel"
+)
+
+func main() {
+	fmt.Println(squirrel.Select("user_id", "user_name").
+		From("users").
+		Where("user_id=?", 123).
+		OrderBy("user_id desc").
+		Limit(10).ToSql())
+}
+```
+
+运行 `go run test.go` 可以看到控制台信息：
+
+`SELECT user_id, user_name FROM users WHERE user_id=? ORDER BY user_id desc LIMIT 10 [123] <nil>`
+
+返回3个值，第1个是 sql 语句，第2个是参数为 `[]interface{}` ，第3个是错误。
+
+之前获取用户数据的相关操作在 `src/data/getter/user_getter.go` 文件中，
+
+现在我们对获取数据进行封装，在 `src/data` 目录下新建 `mappers`，放和 `SQL` 相关的内容。
+
+新建文件 `user_mapper.go`
+
+```go
+package mappers
+
+import "github.com/Masterminds/squirrel"
+
+type UserMapper struct{}
+
+func (*UserMapper) GetUserList() *SqlMapper {
+	return Mapper(squirrel.Select("user_id", "user_name").
+		From("users").
+		OrderBy("user_id desc").
+		Limit(10).ToSql())
+}
+```
+
+`GetUserList()` 返回的就是 `sql` 语句，使用 `sql` 拼接工具，就是 
+
+`squirrel.Select("user_id", "user_name").
+		From("users").
+		Where("user_id=?", 123).
+		OrderBy("user_id desc").
+		Limit(10).ToSql()`
+
+可以把返回的前两个参数保存到 `strcut` 中，最后一个参数错误可以用中间件处理。
+
+因此这里再写一个保存到自定义 `struct` 的文件 `sql_mapper.go` 通用类。
+
+```go
+package mappers
+
+type SqlMapper struct {
+	Sql  string
+	Args []interface{}
+}
+
+func NewSqlMapper(sql string, args []interface{}) *SqlMapper {
+	return &SqlMapper{Sql: sql, Args: args}
+}
+
+// Mapper 转换返回值生成 SqlMapper
+func Mapper(sql string, args []interface{}, err error) *SqlMapper {
+	if err != nil {
+		panic(err.Error())
+	}
+	return NewSqlMapper(sql, args)
+}
+```
+
+到这里，`GetUserList()` 就完成了封装，在 `src/data/getter/user_getter.go` 中修改代码
+
+```go
+package getter
+
+import (
+	"fmt"
+	"ginskill/src/data/mappers"
+	"ginskill/src/dbs"
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+)
+
+// 对外使用的接口
+var UserGetter IUserGetter
+
+func init() {
+	UserGetter = NewUserGetterImpl() // 业务更改，可以更换实现类
+}
+
+// IUserGetter 接口
+type IUserGetter interface {
+	GetUserList() []*UserModel.UserModelImpl // 返回实体列表
+	GetUserByID(id int) *result.ErrorResult
+}
+
+// UserGetterImpl 实现 IUserGetter 接口
+type UserGetterImpl struct {
+	// 注入 UserMapper
+	userMapper *mappers.UserMapper
+}
+
+// NewUserGetterImpl IUserGetter 接口的实现类
+func NewUserGetterImpl() *UserGetterImpl {
+	return &UserGetterImpl{userMapper: &mappers.UserMapper{}} // 在构造函数中赋值
+}
+
+// GetUserList 实现
+func (this *UserGetterImpl) GetUserList() (users []*UserModel.UserModelImpl) {
+	//dbs.Orm.Find(&users)
+	sqlMapper := this.userMapper.GetUserList()
+	dbs.Orm.Raw(sqlMapper.Sql, sqlMapper.Args).Find(&users) // 不管这个 ORM 是 gorm 还是 xorm 都可以执行原生 sql
+	return
+}
+
+// GetUserByID 通过 id 获取 user 数据
+func (this *UserGetterImpl) GetUserByID(id int) *result.ErrorResult {
+	user := UserModel.New()
+	db := dbs.Orm.Where("user_id=?", id).Find(user)
+	if db.Error != nil || db.RowsAffected == 0 {
+		return result.Result(nil, fmt.Errorf("not found user, id = %d", id))
+	}
+	return result.Result(user, nil)
+}
+```
+
+代码变动 [git commit ]()
+
+
+
+
+
+
+

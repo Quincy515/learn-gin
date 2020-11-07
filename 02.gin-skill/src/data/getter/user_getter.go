@@ -2,6 +2,7 @@ package getter
 
 import (
 	"fmt"
+	"ginskill/src/data/mappers"
 	"ginskill/src/dbs"
 	"ginskill/src/models/UserModel"
 	"ginskill/src/result"
@@ -21,16 +22,21 @@ type IUserGetter interface {
 }
 
 // UserGetterImpl 实现 IUserGetter 接口
-type UserGetterImpl struct{}
+type UserGetterImpl struct {
+	// 注入 UserMapper
+	userMapper *mappers.UserMapper
+}
 
 // NewUserGetterImpl IUserGetter 接口的实现类
 func NewUserGetterImpl() *UserGetterImpl {
-	return &UserGetterImpl{}
+	return &UserGetterImpl{userMapper: &mappers.UserMapper{}} // 在构造函数中赋值
 }
 
 // GetUserList 实现
 func (this *UserGetterImpl) GetUserList() (users []*UserModel.UserModelImpl) {
-	dbs.Orm.Find(&users)
+	//dbs.Orm.Find(&users)
+	sqlMapper := this.userMapper.GetUserList()
+	dbs.Orm.Raw(sqlMapper.Sql, sqlMapper.Args).Find(&users) // 不管这个 ORM 是 gorm 还是 xorm 都可以执行原生 sql
 	return
 }
 
