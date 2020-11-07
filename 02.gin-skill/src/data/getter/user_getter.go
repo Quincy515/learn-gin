@@ -3,7 +3,6 @@ package getter
 import (
 	"fmt"
 	"ginskill/src/data/mappers"
-	"ginskill/src/dbs"
 	"ginskill/src/models/UserModel"
 	"ginskill/src/result"
 )
@@ -35,15 +34,17 @@ func NewUserGetterImpl() *UserGetterImpl {
 // GetUserList 实现
 func (this *UserGetterImpl) GetUserList() (users []*UserModel.UserModelImpl) {
 	//dbs.Orm.Find(&users)
-	sqlMapper := this.userMapper.GetUserList()
-	dbs.Orm.Raw(sqlMapper.Sql, sqlMapper.Args).Find(&users) // 不管这个 ORM 是 gorm 还是 xorm 都可以执行原生 sql
+	//sqlMapper := this.userMapper.GetUserList()
+	//dbs.Orm.Raw(sqlMapper.Sql, sqlMapper.Args).Find(&users) // 不管这个 ORM 是 gorm 还是 xorm 都可以执行原生 sql
+	this.userMapper.GetUserList().Query().Find(&users)
 	return
 }
 
 // GetUserByID 通过 id 获取 user 数据
 func (this *UserGetterImpl) GetUserByID(id int) *result.ErrorResult {
 	user := UserModel.New()
-	db := dbs.Orm.Where("user_id=?", id).Find(user)
+	//db := dbs.Orm.Where("user_id=?", id).Find(user)
+	db := this.userMapper.GetUserDetail(id).Query().Find(user)
 	if db.Error != nil || db.RowsAffected == 0 {
 		return result.Result(nil, fmt.Errorf("not found user, id = %d", id))
 	}

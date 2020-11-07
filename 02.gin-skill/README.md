@@ -1394,11 +1394,148 @@ func (this *UserGetterImpl) GetUserByID(id int) *result.ErrorResult {
 }
 ```
 
-代码变动 [git commit ]()
+代码变动 [git commit ](https://github.com/custer-go/learn-gin/commit/c1e9bc2ab2a4857e909039963351807628dcafd1#diff-ea201d1f4c74f3879aa9afde55923f139e932bc2b6c6f447e25959395db3fab8L2)
 
+### 15. DB查询技巧(2):进一步简化SQL调用
 
+上面拼接 `sql` 并手动调用 `orm` 可以进一步封装
 
+`sqlMapper := this.userMapper.GetUserList()`
 
+`dbs.Orm.Raw(sqlMapper.Sql, sqlMapper.Args).Find(&users)`
 
+首先对 `SqlMapper` 进行扩展
 
+```go
+// File: src/data/mapper/sql_mapper.go
+package mappers
+
+import (
+	"ginskill/src/dbs"
+	"gorm.io/gorm"
+)
+
+type SqlMapper struct {
+	Sql  string
+	Args []interface{}
+}
+
+func NewSqlMapper(sql string, args []interface{}) *SqlMapper {
+	return &SqlMapper{Sql: sql, Args: args}
+}
+
+// Mapper 转换返回值生成 SqlMapper
+func Mapper(sql string, args []interface{}, err error) *SqlMapper {
+	if err != nil {
+		panic(err.Error())
+	}
+	return NewSqlMapper(sql, args)
+}
+
+// Query 对 SqlMapper 进行查询的封装
+func (this *SqlMapper) Query() *gorm.DB {
+	return dbs.Orm.Raw(this.Sql, this.Args)
+}
+
+// Exec 对 SqlMapper 进行执行 update/delete/inset 的封装
+func (this *SqlMapper) Exec() *gorm.DB {
+	return dbs.Orm.Exec(this.Sql, this.Args)
+}
+```
+
+这样就可以直接执行 `this.userMapper.GetUserList().Query().Find(&users)`
+
+```go
+// GetUserList 实现
+func (this *UserGetterImpl) GetUserList() (users []*UserModel.UserModelImpl) {
+	//dbs.Orm.Find(&users)
+	//sqlMapper := this.userMapper.GetUserList()
+	//dbs.Orm.Raw(sqlMapper.Sql, sqlMapper.Args).Find(&users) // 不管这个 ORM 是 gorm 还是 xorm 都可以执行原生 sql
+	this.userMapper.GetUserList().Query().Find(&users)
+	return
+}
+```
+
+再对获取用户详情也进行修改
+
+```go
+// File: src/data/mappers/user_mapper.go
+package mappers
+
+import "github.com/Masterminds/squirrel"
+
+type UserMapper struct{}
+
+func (*UserMapper) GetUserList() *SqlMapper {
+	return Mapper(squirrel.Select("user_id", "user_name").
+		From("users").
+		OrderBy("user_id desc").
+		Limit(10).ToSql())
+}
+
+func (*UserMapper) GetUserDetail(id int) *SqlMapper {
+	return Mapper(squirrel.Select("user_id", "user_name").
+		From("users").Where("user_id=?", id).ToSql())
+}
+```
+
+这样获取用户详情的 orm 操作也可以统一
+
+```go
+// File: src/data/getter/user_getter.go
+package getter
+
+import (
+	"fmt"
+	"ginskill/src/data/mappers"
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+)
+
+// 对外使用的接口
+var UserGetter IUserGetter
+
+func init() {
+	UserGetter = NewUserGetterImpl() // 业务更改，可以更换实现类
+}
+
+// IUserGetter 接口
+type IUserGetter interface {
+	GetUserList() []*UserModel.UserModelImpl // 返回实体列表
+	GetUserByID(id int) *result.ErrorResult
+}
+
+// UserGetterImpl 实现 IUserGetter 接口
+type UserGetterImpl struct {
+	// 注入 UserMapper
+	userMapper *mappers.UserMapper
+}
+
+// NewUserGetterImpl IUserGetter 接口的实现类
+func NewUserGetterImpl() *UserGetterImpl {
+	return &UserGetterImpl{userMapper: &mappers.UserMapper{}} // 在构造函数中赋值
+}
+
+// GetUserList 实现
+func (this *UserGetterImpl) GetUserList() (users []*UserModel.UserModelImpl) {
+	//dbs.Orm.Find(&users)
+	//sqlMapper := this.userMapper.GetUserList()
+	//dbs.Orm.Raw(sqlMapper.Sql, sqlMapper.Args).Find(&users) // 不管这个 ORM 是 gorm 还是 xorm 都可以执行原生 sql
+	this.userMapper.GetUserList().Query().Find(&users)
+	return
+}
+
+// GetUserByID 通过 id 获取 user 数据
+func (this *UserGetterImpl) GetUserByID(id int) *result.ErrorResult {
+	user := UserModel.New()
+	//db := dbs.Orm.Where("user_id=?", id).Find(user)
+	db := this.userMapper.GetUserDetail(id).Query().Find(user)
+	if db.Error != nil || db.RowsAffected == 0 {
+		return result.Result(nil, fmt.Errorf("not found user, id = %d", id))
+	}
+	return result.Result(user, nil)
+}
+```
+
+代码变动  [git commit ]()
 
