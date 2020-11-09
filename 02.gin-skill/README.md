@@ -1434,7 +1434,7 @@ func Mapper(sql string, args []interface{}, err error) *SqlMapper {
 
 // Query 对 SqlMapper 进行查询的封装
 func (this *SqlMapper) Query() *gorm.DB {
-	return dbs.Orm.Raw(this.Sql, this.Args)
+	return dbs.Orm.Raw(this.Sql, this.Args...)
 }
 
 // Exec 对 SqlMapper 进行执行 update/delete/inset 的封装
@@ -1617,5 +1617,209 @@ func UserSave(c *gin.Context) {
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/739d7d509c9ac691b4d7c9c931b25d94fcc9064d#diff-dc9cfc903691f005e14fee8414ebc29fada8a9579a46522c7d1a181cd8dfcac6L29)
+
+### 17. DB查询技巧(4):事务的执行和封装技巧
+
+增加一张日志表 `logs`
+
+<img src="I:/space/2020/11/learn-gin/imgs/12_logs.png" style="zoom:95%;" />
+
+往 `users` 表新增数据，同时往 `logs` 表新增数据，如果出错，就回滚。
+
+在 `src/models` 文件夹下新增 `LogModel` 文件件，日志模型 `model.go`
+
+```go
+package LogModel
+
+import "time"
+
+type LogImpl struct {
+	LogID   int       `gorm:"column:log_id,type:int,primaryKey,autoIncrement" json:"id"`
+	LogName string    `json:"log_name"`
+	LogDate time.Time `json:"log_date"`
+}
+
+func NewLogImpl(logID int, logName string, logDate time.Time) *LogImpl {
+	return &LogImpl{LogID: logID, LogName: logName, LogDate: logDate}
+}
+
+func (*LogImpl) TableName() string {
+	return "logs"
+}
+```
+
+在 `src/data/mappers` 目录下创建 `log_mapper.go` 文件
+
+```go
+package mappers
+
+import (
+	"ginskill/src/models/LogModel"
+	"github.com/Masterminds/squirrel"
+)
+
+type LogMapper struct{}
+
+func (*LogMapper) AddLog(log *LogModel.LogImpl) *SqlMapper {
+	return Mapper(squirrel.Insert(log.TableName()).
+		Columns("log_name", "log_date").
+		Values(log.LogName, log.LogDate).ToSql())
+}
+```
+
+修改新增用户的业务逻辑，之前是单表
+
+```go
+func (this *UserSetterImpl) SaveUser(user *UserModel.UserModelImpl) *result.ErrorResult {
+	ret := this.userMapper.AddNewUser(user).Exec()
+	return result.Result(ret.RowsAffected, ret.Error)
+}
+```
+
+现在同时要新增日志表
+
+```go
+func (this *UserSetterImpl) SaveUser(user *UserModel.UserModelImpl) *result.ErrorResult {
+	addUser := this.userMapper.AddNewUser(user).Exec()
+	addLog := this.logMapper.AddLog(LogModel.NewLogImpl("add_user", time.Now()))
+	return result.Result(ret.RowsAffected, ret.Error)
+}
+```
+
+这两步操作修改为事物
+
+`addUser := this.userMapper.AddNewUser(user).Exec()`
+
+`addLog := this.logMapper.AddLog(LogModel.NewLogImpl("add_user", time.Now()))`
+
+在 `src/data/mappers/sql_mapper.go` 中修改代码
+
+```go
+package mappers
+
+import (
+	"ginskill/src/dbs"
+	"gorm.io/gorm"
+)
+
+type SqlMapper struct {
+	Sql  string        // sql 语句
+	Args []interface{} // 参数集合
+	db   *gorm.DB
+}
+
+// setDB 私有方法
+func (this *SqlMapper) setDB(db *gorm.DB) {
+	this.db = db
+}
+
+func NewSqlMapper(sql string, args []interface{}) *SqlMapper {
+	return &SqlMapper{Sql: sql, Args: args} // 单表执行
+}
+
+// Mapper 转换返回值生成 SqlMapper
+func Mapper(sql string, args []interface{}, err error) *SqlMapper {
+	if err != nil {
+		panic(err.Error())
+	}
+	return NewSqlMapper(sql, args)
+}
+
+// Query 对 SqlMapper 进行查询的封装
+func (this *SqlMapper) Query() *gorm.DB {
+	if this.db != nil { // 不是单表执行
+		return this.db.Raw(this.Sql, this.Args...)
+	}
+	return dbs.Orm.Raw(this.Sql, this.Args...) // 单表执行
+}
+
+// Exec 对 SqlMapper 进行执行 update/delete/inset 的封装
+func (this *SqlMapper) Exec() *gorm.DB {
+	if this.db != nil { // 不是单表执行
+		return this.db.Exec(this.Sql, this.Args...)
+	}
+	return dbs.Orm.Exec(this.Sql, this.Args...) // 单表执行
+}
+
+// SqlMappers 定义多表的事物操作
+type SqlMappers []*SqlMapper
+
+func Mappers(sqlMappers ...*SqlMapper) (list SqlMappers) {
+	list = sqlMappers
+	return
+}
+
+// 执行 Mappers 方法，就把所有 sql 执行设置为同一个 db
+func (this SqlMappers) apply(tx *gorm.DB) {
+	for _, sql := range this {
+		sql.setDB(tx) // 多表执行
+	}
+}
+
+// Exec 多表执行，传入函数 f，表示执行事物
+func (this SqlMappers) Exec(f func() error) error {
+	return dbs.Orm.Transaction(func(tx *gorm.DB) error {
+		this.apply(tx) // tx 就是统一使用的 db 对象
+		return f()     // gorm Transaction 机制返回的是 error 就自动回滚，不是 error 就执行 commit 操作
+	})
+}
+```
+
+保存用户的事务操作修改
+
+```go
+package setter
+
+import (
+	"ginskill/src/data/mappers"
+	"ginskill/src/models/LogModel"
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+	"time"
+)
+
+var UserSetter IUserSetter
+
+func init() {
+	UserSetter = NewUserSetterImpl()
+}
+
+type IUserSetter interface {
+	SaveUser(*UserModel.UserModelImpl) *result.ErrorResult
+}
+
+type UserSetterImpl struct {
+	userMapper *mappers.UserMapper
+	logMapper  *mappers.LogMapper
+}
+
+func NewUserSetterImpl() *UserSetterImpl {
+	return &UserSetterImpl{
+		userMapper: &mappers.UserMapper{},
+		logMapper:  &mappers.LogMapper{},
+	}
+}
+
+func (this *UserSetterImpl) SaveUser(user *UserModel.UserModelImpl) *result.ErrorResult {
+	addUser := this.userMapper.AddNewUser(user)
+	addLog := this.logMapper.AddLog(LogModel.NewLogImpl("add_user", time.Now()))
+	// 执行事物的代码
+	err := mappers.Mappers(addUser, addLog).Exec(func() error {
+		err := addUser.Exec().Error
+		if err != nil {
+			return err
+		}
+		// 其他业务内容
+		err = addLog.Exec().Error
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return result.Result("success", err)
+}
+```
+
+代码变动 [git commit ]()
 
