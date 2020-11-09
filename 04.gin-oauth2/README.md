@@ -176,7 +176,7 @@ import (
 var sessionStore = sessions.NewCookieStore([]byte("123456"))
 
 func init() {
-	sessionStore.Options.Domain = "127.0.0.1:8001"
+	sessionStore.Options.Domain = "127.0.0.1:8081"
 	sessionStore.Options.Path = "/"
 	sessionStore.Options.MaxAge = 0 // 关闭浏览器就清除 session
 }
@@ -312,6 +312,154 @@ func main() {
 		err := srv.HandleAuthorizeRequest(c.Writer, c.Request)
 		if err != nil {
 			log.Println(err)
+		}
+	})
+	r.Any("/login", func(c *gin.Context) {
+		data := map[string]string{
+			"error": "",
+		}
+		if c.Request.Method == http.MethodPost {
+			// 对提交的信息进行处理
+			uname, upass := c.PostForm("userName"), c.PostForm("userPass")
+			if uname+upass == "custer123" {
+				utils.SaveUserSession(c, uname)
+				c.Redirect(302, "/auth?"+c.Request.URL.RawQuery)
+				return
+			} else {
+				data["error"] = "用户名密码错误"
+			}
+		}
+		c.HTML(200, "login.html", data)
+	})
+	r.LoadHTMLGlob("public/*.html")
+	r.Run(":8081")
+}
+
+// userAuthorizationHandler 确保授权时跳转到登录页面 login.html
+func userAuthorizationHandler(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	if userID = utils.GetUserSession(r); userID == "" {
+		w.Header().Set("Location", "/login?"+r.URL.RawQuery)
+		w.WriteHeader(302)
+	}
+	return
+}
+```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/bf67092b04c442ea0ef6288b41eaa52fe5310fba#diff-49dab0ade8de98d1e754c8aba53f725f0ebcb8a86e3a20ea8e901e9525f270d7L4)
+
+### 04. 客户端使用授权码请求token
+
+上面的代码登录之后跳转到 http://localhost:8080/getcode?code=MGY2NDZJZGYTMWIYNY0ZOGVLLWI1NJYTYMRJOTVKZTGXMZE0 并获取到了授权码 `code`
+
+go 的 `oauth2` 的客户端库 https://github.com/golang/oauth2，在 `a` 网站里需要安装这个库，安装
+
+`go get golang.org/x/oauth2`
+
+客户端 `a` 的代码
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"golang.org/x/oauth2"
+)
+
+const authServerURL = "http://127.0.0.1:8081"
+
+var (
+	oauth2Config = oauth2.Config{
+		ClientID:     "clienta",
+		ClientSecret: "123",
+		Scopes:       []string{"all"},
+		RedirectURL:  "http://localhost:8080/getcode",
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  authServerURL + "/auth",  // 获取授权码地址
+			TokenURL: authServerURL + "/token", // 获取 token 地址
+		},
+	}
+)
+
+func main() {
+	r := gin.Default()
+	r.LoadHTMLGlob("public/*")
+	//codeUrl, _ := url.ParseRequestURI("http://localhost:8080/getcode")
+	//loginUrl := "http://127.0.0.1:8081/auth?" +
+	//	"response_type=code&client_id=clienta&redirect_uri=" +
+	//	codeUrl.String()
+	// state 参数，传递给服务端，验证通过会原封不动的传回客户端，
+	// 在 /getcode 里理论上需要对 state 进行判断，防止被串改。
+	loginUrl := oauth2Config.AuthCodeURL("myclient")
+
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(200, "a-index.html", map[string]string{
+			"loginUrl": loginUrl,
+		})
+	})
+	r.GET("/getcode", func(c *gin.Context) {
+		code, _ := c.GetQuery("code")
+		//c.JSON(200, gin.H{"code": code})
+		token, err := oauth2Config.Exchange(c, code)
+		if err != nil {
+			c.JSON(400, gin.H{"message": err.Error()})
+		} else {
+			c.JSON(200, token)
+		}
+	})
+	r.Run(":8080")
+}
+```
+
+服务端 `s.go` 代码修改
+
+```go
+package main
+
+import (
+	"gin-oauth2/utils"
+	"github.com/gin-gonic/gin"
+	"github.com/go-oauth2/oauth2/v4/manage"
+	"github.com/go-oauth2/oauth2/v4/models"
+	"github.com/go-oauth2/oauth2/v4/server"
+	"github.com/go-oauth2/oauth2/v4/store"
+	"log"
+	"net/http"
+)
+
+var srv *server.Server
+
+func main() {
+	manager := manage.NewDefaultManager()                 // 1. 创建管理对象
+	manager.MustTokenStorage(store.NewMemoryTokenStore()) // 保存 token
+
+	clientStore := store.NewClientStore() // 2. 客户端和服务端关联
+	err := clientStore.Set("clienta", &models.Client{
+		ID:     "clienta", // a 网站 id
+		Secret: "123",
+		Domain: "http://localhost:8080",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	manager.MapClientStorage(clientStore) // 映射 client store
+
+	// 3. 创建 http server
+	srv = server.NewDefaultServer(manager)
+	srv.SetUserAuthorizationHandler(userAuthorizationHandler)
+
+	r := gin.New()
+	r.Use(utils.ErrorHandler())
+	// 相应授权码
+	r.GET("/auth", func(c *gin.Context) {
+		err := srv.HandleAuthorizeRequest(c.Writer, c.Request)
+		if err != nil {
+			log.Println(err)
+		}
+	})
+	r.POST("/token", func(c *gin.Context) {
+		err := srv.HandleTokenRequest(c.Writer, c.Request)
+		if err != nil {
+			panic(err.Error())
 		}
 	})
 	r.Any("/login", func(c *gin.Context) {

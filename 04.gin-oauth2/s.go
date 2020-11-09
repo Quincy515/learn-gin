@@ -11,6 +11,8 @@ import (
 	"net/http"
 )
 
+var srv *server.Server
+
 func main() {
 	manager := manage.NewDefaultManager()                 // 1. 创建管理对象
 	manager.MustTokenStorage(store.NewMemoryTokenStore()) // 保存 token
@@ -27,7 +29,7 @@ func main() {
 	manager.MapClientStorage(clientStore) // 映射 client store
 
 	// 3. 创建 http server
-	srv := server.NewDefaultServer(manager)
+	srv = server.NewDefaultServer(manager)
 	srv.SetUserAuthorizationHandler(userAuthorizationHandler)
 
 	r := gin.New()
@@ -37,6 +39,12 @@ func main() {
 		err := srv.HandleAuthorizeRequest(c.Writer, c.Request)
 		if err != nil {
 			log.Println(err)
+		}
+	})
+	r.POST("/token", func(c *gin.Context) {
+		err := srv.HandleTokenRequest(c.Writer, c.Request)
+		if err != nil {
+			panic(err.Error())
 		}
 	})
 	r.Any("/login", func(c *gin.Context) {

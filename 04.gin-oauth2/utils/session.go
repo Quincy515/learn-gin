@@ -9,7 +9,7 @@ import (
 var sessionStore = sessions.NewCookieStore([]byte("123456"))
 
 func init() {
-	sessionStore.Options.Domain = "127.0.0.1:8001"
+	sessionStore.Options.Domain = "127.0.0.1:8081"
 	sessionStore.Options.Path = "/"
 	sessionStore.Options.MaxAge = 0 // 关闭浏览器就清除 session
 }
