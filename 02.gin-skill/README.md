@@ -1902,5 +1902,83 @@ func And(id int, fs ...BoolFunc) bool {
 
 这样就可以使用 `if And(userid, IsA, IsB, IsC) { return 1 }`
 
-代码变动 [git commit ]()
+代码变动 [git commit ](https://github.com/custer-go/learn-gin/commit/f748b9ea201c8eebbc23a33a9f8ef05913311342#diff-6ce5c1ebf59e4f995542a612b321d3df8626aa8483b69717dfa0729444fe82d2L6)
 
+### 22. 代码优化课(4):利用装饰器输出统一JSON格式
+
+```go
+package code
+
+import "github.com/gin-gonic/gin"
+
+func GetUserList(c *gin.Context) {
+	// 各种业务代码
+	c.JSON(200, gin.H{"message": "xxx", "code": 1000, "data": ""})
+}
+
+func GetUserDetail(c *gin.Context) {
+	// 各种业务代码
+	c.JSON(200, gin.H{"message": "xxx", "code": 1000, "data": ""})
+}
+```
+
+利用装饰器输出统一JSON格式，首先抽离公共部分，可以看成
+
+ `func 函数名 (c *gin.Context) (string, int, interface{}){}`
+
+把函数公共部分抽取出来，包含参数和返回值，并且把它变成自定义变量 
+
+`type MyHandler func(c *gin.Context) (string, int, interface{})`
+
+新建一个函数，函数的参数是 抽取出来的自定义变量，返回值是 `gin.HandlerFunc`
+
+```go
+func Handler() func(h MyHandler) gin.HandlerFunc {
+	return func(h MyHandler) gin.HandlerFunc {
+		return func(context *gin.Context) {
+
+		}
+	}
+}
+```
+
+这里的 `context *gin.Context` 用来给 `h` 执行
+
+```go
+package main
+
+import "github.com/gin-gonic/gin"
+
+func main() {
+	r := gin.New()
+	r.GET("/users", Handler()(GetUserList))
+	r.GET("/users/:id", Handler()(GetUserDetail))
+	r.Run(":8080")
+}
+
+type MyHandler func(c *gin.Context) (string, int, interface{})
+
+func Handler() func(h MyHandler) gin.HandlerFunc {
+	return func(h MyHandler) gin.HandlerFunc {
+		return func(context *gin.Context) {
+			msg, code, result := h(context)
+			if code > 200 { // 代表可以做业务判断
+				context.JSON(200, gin.H{"message": msg, "code": code, "result": result})
+			} else {
+				context.JSON(400, gin.H{"message": msg, "code": code, "result": result})
+			}
+		}
+	}
+}
+func GetUserList(c *gin.Context) (string, int, interface{}) {
+	// 各种业务代码
+	return "userlist", 1001, "user_list"
+}
+
+func GetUserDetail(c *gin.Context) (string, int, interface{}) {
+	// 各种业务代码
+	return "userdetail", 1001, "user_detail:" + c.Param("id")
+}
+```
+
+代码变动 [git commit]()
