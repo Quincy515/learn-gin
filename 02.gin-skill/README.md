@@ -1872,4 +1872,35 @@ func Or(id int, f1 BoolFunc, f2 BoolFunc) bool {
 
 可以修改为 `if Or(userid, IsB, IsC) { return 2 }`
 
+代码修改 [git commit](https://github.com/custer-go/learn-gin/commit/6298c535dd22e0010e01fac18b43e6ce784b8ae4#diff-6ce5c1ebf59e4f995542a612b321d3df8626aa8483b69717dfa0729444fe82d2R1)
+
+### 21. 修改为可变参数
+
+```go
+func And(id int, f1 BoolFunc, f2 BoolFunc) bool {
+	return f1(id) && f2(id)
+}
+```
+
+修改为可变参数
+
+```go
+func And(id int, fs ...BoolFunc) bool {
+	if len(fs) == 0 {
+		return false
+	}
+	v := fs[0](id) // 初始值，执行第一个函数
+	for index := range fs {
+		if index == 0 {
+			continue
+		}
+		v = v && fs[index](id)
+	}
+	return v
+}
+```
+
+这样就可以使用 `if And(userid, IsA, IsB, IsC) { return 1 }`
+
 代码变动 [git commit ]()
+
