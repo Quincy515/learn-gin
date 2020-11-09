@@ -1,0 +1,8 @@
+
+p, admin,domain1, /depts, GET
+
+p, admin,domain2, /depts, POST
+
+g, shenyi, admin, domain1
+g, lisi, admin, domain2
+

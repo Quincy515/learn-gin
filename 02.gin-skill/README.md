@@ -1981,4 +1981,4 @@ func GetUserDetail(c *gin.Context) (string, int, interface{}) {
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/abad758e72da8a3451b9a1b09834fa07003f4334#diff-52cba1f866effdd7d1035c75f5fdd88a92728daef629d93f30069bb2e8bb46f7R1)

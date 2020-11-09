@@ -1,0 +1,10 @@
+p, member, /depts, GET
+p, member, /depts/:id, GET
+
+p, admin, /depts, POST
+p, admin, /depts/:id, PUT
+p, admin, /depts/:id, DELETE
+
+g, admin, member
+g, guanliyuan, admin
+g, putongyonghu, member
