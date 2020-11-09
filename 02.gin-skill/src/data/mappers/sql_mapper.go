@@ -29,5 +29,5 @@ func (this *SqlMapper) Query() *gorm.DB {
 
 // Exec 对 SqlMapper 进行执行 update/delete/inset 的封装
 func (this *SqlMapper) Exec() *gorm.DB {
-	return dbs.Orm.Exec(this.Sql, this.Args)
+	return dbs.Orm.Exec(this.Sql, this.Args...)
 }

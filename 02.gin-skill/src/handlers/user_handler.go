@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"ginskill/src/data/getter"
+	"ginskill/src/data/setter"
 	"ginskill/src/models/UserModel"
 	"ginskill/src/result"
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,6 @@ func UserSave(c *gin.Context) {
 	R(c)(
 		"save_user",
 		"10001",
-		"true",
+		setter.UserSetter.SaveUser(u).Unwrap(),
 	)(OK)
 }

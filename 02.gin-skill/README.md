@@ -1439,7 +1439,7 @@ func (this *SqlMapper) Query() *gorm.DB {
 
 // Exec 对 SqlMapper 进行执行 update/delete/inset 的封装
 func (this *SqlMapper) Exec() *gorm.DB {
-	return dbs.Orm.Exec(this.Sql, this.Args)
+	return dbs.Orm.Exec(this.Sql, this.Args...)
 }
 ```
 
@@ -1537,5 +1537,85 @@ func (this *UserGetterImpl) GetUserByID(id int) *result.ErrorResult {
 }
 ```
 
-代码变动  [git commit ]()
+代码变动  [git commit ](https://github.com/custer-go/learn-gin/commit/edd4d31d03e72f9d463b9ae4dbc395fee17ef5a0#diff-ea201d1f4c74f3879aa9afde55923f139e932bc2b6c6f447e25959395db3fab8L3)
+
+### 16. DB查询技巧(3):新增数据练习
+
+练习新增数据，来到 `main.go` 首先对新增 `hanlder` 进行处理。
+
+之前在 `src/handlers/user_handler.go` 中强制返回 `true`
+
+```go
+func UserSave(c *gin.Context) {
+	u := UserModel.New()
+	result.Result(c.ShouldBindJSON(u)).Unwrap()
+	R(c)(
+		"save_user",
+		"10001",
+		"true",
+	)(OK)
+}
+```
+
+第1步，来到 `src/data/mappers/user_mapper.go` 增加新增用户的 `sql` 
+
+```go
+// AddNewUser 新增用户，传入用户实体
+func (*UserMapper) AddNewUser(user *UserModel.UserModelImpl) *SqlMapper {
+	return Mapper(squirrel.Insert(user.TableName()).
+		Columns("user_name", "user_pwd", "user_addtime").
+		Values(user.UserName, user.UserPwd, time.Now()).ToSql())
+}
+```
+
+新增数据，在 `src/data` 目录下新增 `setter` 目录，新增 `user_setter.go` 文件
+
+```go
+package setter
+
+import (
+	"ginskill/src/data/mappers"
+	"ginskill/src/models/UserModel"
+	"ginskill/src/result"
+)
+
+var UserSetter IUserSetter
+
+func init() {
+	UserSetter = NewUserSetterImpl()
+}
+
+type IUserSetter interface {
+	SaveUser(impl *UserModel.UserModelImpl) *result.ErrorResult
+}
+
+type UserSetterImpl struct {
+	userMapper *mappers.UserMapper
+}
+
+func NewUserSetterImpl() *UserSetterImpl {
+	return &UserSetterImpl{userMapper: &mappers.UserMapper{}}
+}
+
+func (this *UserSetterImpl) SaveUser(user *UserModel.UserModelImpl) *result.ErrorResult  {
+	ret := this.userMapper.AddNewUser(user).Exec()
+	return result.Result(ret.RowsAffected, ret.Error)
+}
+```
+
+最后修改 `handler` 
+
+```go
+func UserSave(c *gin.Context) {
+	u := UserModel.New()
+	result.Result(c.ShouldBindJSON(u)).Unwrap()
+	R(c)(
+		"save_user",
+		"10001",
+		setter.UserSetter.SaveUser(u).Unwrap(),
+	)(OK)
+}
+```
+
+代码变动 [git commit]()
 
