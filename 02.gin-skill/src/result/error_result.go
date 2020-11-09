@@ -18,6 +18,20 @@ func (this *ErrorResult) Unwrap() interface{} {
 	return this.data
 }
 
+func (this *ErrorResult) UnwrapOr(v interface{}) interface{} {
+	if this.err != nil {
+		return v // 如果有错误直接返回 v
+	}
+	return this.data
+}
+
+func (this *ErrorResult) UnwrapOrElse(f func() interface{}) interface{} {
+	if this.err != nil {
+		return f() // 如果有错误执行函数 f，返回 interface{}
+	}
+	return this.data
+}
+
 func Result(vs ...interface{}) *ErrorResult {
 	if len(vs) == 1 {
 		if vs[0] == nil {
@@ -27,7 +41,7 @@ func Result(vs ...interface{}) *ErrorResult {
 			return &ErrorResult{nil, e}
 		}
 	}
-	if len(vs) == 2 {
+	if len(vs) == 2 { // 如果可变参数有2个判断第2个参数是否有错
 		if vs[1] == nil {
 			return &ErrorResult{vs[0], nil}
 		}
