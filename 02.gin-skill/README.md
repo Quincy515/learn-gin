@@ -1823,3 +1823,53 @@ func (this *UserSetterImpl) SaveUser(user *UserModel.UserModelImpl) *result.Erro
 
 代码变动 [git commit ](https://github.com/custer-go/learn-gin/commit/5dce0385661c465f0b15dc51bc2ee1f9eae02bf8#diff-4d406b3831f00255b91bb136ac61bb998ba3566e27f5854de94d1df9d3214797R1)
 
+### 20. 代码优化课(3):如何抽取公共判断
+
+代码根据用户 id 判断用户等级
+
+```go
+package code
+
+func IsA(userid int) bool { return userid > 10 } // 是否是付费用户
+func IsB(userid int) bool { return userid > 15 } // 是否领取优惠券
+func IsC(userid int) bool { return userid > 20 } // 是否连续登陆次数过多
+
+// 根据用户 ID 获取用户等级
+func GetUserLevel(userid int) int {
+	if IsA(userid) && IsB(userid) { // 同时满足
+		return 1
+	}
+	if IsB(userid) || IsC(userid) { // 满足一个
+		return 2
+	}
+	return 0
+}
+```
+
+有公共特征，函数的参数都是 `userid int` 抽取出来 `type BoolFunc func(int) bool`
+
+`if IsA(userid) && IsB(userid) { return 1 }`
+
+抽取成出来
+
+```go
+func And(id int, f1 BoolFunc, f2 BoolFunc) bool {
+	return f1(id) && f2(id)
+}
+```
+
+则原先修改为，同一个参数应用于不同函数，同时满足 `if And(userid, IsA, IsB) { return 1 }`
+
+同理可以抽取出
+
+```go
+func Or(id int, f1 BoolFunc, f2 BoolFunc) bool {
+	return f1(id) || f2(id)
+}
+```
+
+那么 `if IsB(userid) || IsC(userid) { return 2 }`
+
+可以修改为 `if Or(userid, IsB, IsC) { return 2 }`
+
+代码变动 [git commit ]()
