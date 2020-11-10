@@ -311,7 +311,81 @@ func (this *Goft) Mount(classes ...IClass) *Goft {
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/42141001ea2945a28c70beaaf3f9560761a59e94#diff-8d9e1f78703b2eb32787b5d6fcdc6da3201ad241fb4c572b6bbe8eb8284031e3L1)
 
+### 05. 把路由挂载到 Group 中
 
+`gin` 可以自定义 `group` 分组，方便进行 API 版本的管理
 
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	//goft.Ignite().Mount(NewIndexClass(), NewUserClass()).Launch()
+
+	r := gin.New()
+	v1 := r.Group("v1")
+	{
+		v1.GET("/ping", func(c *gin.Context) {
+			c.JSON(200, gin.H{"message": "pong"})
+		})
+	}
+	r.Run()
+}
+```
+
+在 `Mount()` 函数中修改代码实现 `Group` 功能
+
+```go
+func (this *Goft) Mount(group string, classes ...IClass) *Goft {
+	this.g = this.Group(group)
+	for _, class := range classes {
+		class.Build(this)
+	}
+	return this
+}
+```
+
+修改主类 `Goft`
+
+```go
+type Goft struct {
+	*gin.Engine // 把 *gin.Engine 放入主类里
+	g *gin.RouterGroup // 保存 group 对象
+}
+```
+
+不改变控制器代码，可以重载 `gin.Handle()`  函数
+
+```go
+// Handle 重载 gin.Handle 函数
+func (this *Goft) Handle(httpMethod, relativePath string, handlers ...gin.HandlerFunc) *Goft {
+	this.g.Handle(httpMethod, relativePath, handlers...) // 最后一个参数，需要使用 ...来延展
+	return this
+}
+```
+
+这样在 `main.go` 中就可以加入 `group` 参数
+
+```go
+package main
+
+import (
+	. "gin-up/src/classes"
+	"gin-up/src/goft"
+)
+
+func main() {
+	goft.Ignite().
+		Mount("v1", NewIndexClass(),
+			NewUserClass()).
+		Mount("v2", NewIndexClass()).
+		Launch()
+}
+```
+
+代码修改 [git commit]()

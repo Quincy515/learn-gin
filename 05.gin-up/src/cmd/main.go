@@ -6,5 +6,9 @@ import (
 )
 
 func main() {
-	goft.Ignite().Mount(NewIndexClass(), NewUserClass()).Launch()
+	goft.Ignite().
+		Mount("v1", NewIndexClass(),
+			NewUserClass()).
+		Mount("v2", NewIndexClass()).
+		Launch()
 }
