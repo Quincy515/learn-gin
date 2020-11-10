@@ -1,5 +1,7 @@
 gin 脚手架研发
 
+[toc]
+
 ### 01. 从零开始
 
 新建目录 `src/cmd/main.go`
@@ -388,4 +390,156 @@ func main() {
 }
 ```
 
-代码修改 [git commit]()
+代码修改 [git commit](https://github.com/custer-go/learn-gin/commit/eb0ebcd0e6bc032ea783d85d35817114436c5978#diff-9dc2b1b9bae1a7f587f7bc524f1be8a4e736ea93f487ad5451bd110d682b8f70L6)
+
+### 06. 精酿中间件(1):代码架构
+
+`gin` 官方是支持中间件
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		
+	})
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "ok"})
+	})
+	r.Run()
+}
+```
+
+在 `src/goft/Goft.go` 中新增方法 `Attach()` 表示中间件
+
+```go
+// Attach 实现中间件的加入
+func (this *Goft) Attach(f gin.HandlerFunc) *Goft {
+	this.Use(f)
+	return this
+}
+```
+
+在 `main.go` 中就可以使用 `Attach()` 函数加入中间件。
+
+```go
+func main() {
+	goft.Ignite().
+		Attach(func(c *gin.Context) {
+			log.Println("用户中间件")
+		}).
+		Mount("v1",  NewIndexClass(),
+			NewUserClass()).
+		Mount("v2", NewIndexClass()).
+		Launch()
+}
+```
+
+运行访问 http://localhost:8080/v1/ 查看控制台可以看到 
+
+```bash
+[GIN-debug] Listening and serving HTTP on :8080
+2020/11/10 21:43:19 用户中间件
+```
+
+在目录 `src/goft` 下新建 文件 `Fairing.go` 用来规范中间件代码和功能的接口
+
+```go
+package goft
+
+// Fairing 规范中间件代码和功能的接口
+type Fairing interface {
+	OnRequest() error
+}
+```
+
+新建目录 `src/middlewares`，用来专门存放中间件
+
+```go
+package middlewares
+
+import "fmt"
+
+// UserMid 用户中间件，"继承" Fairing 接口
+type UserMid struct{}
+
+func NewUserMid() *UserMid {
+	return &UserMid{}
+}
+
+// OnRequest 在请求进入时，可以处理一些业务逻辑，或控制
+func (this *UserMid) OnRequest() error {
+	fmt.Println("这是新的用户中间件")
+	return nil
+}
+```
+
+现在就可以修改之前实现的 `Attach()` 函数
+
+```go
+// Attach 实现中间件的加入
+func (this *Goft) Attach(f Fairing) *Goft {
+	this.Use(func(c *gin.Context) {
+		err := f.OnRequest()
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.Next() // 继续往下执行
+		}
+	})
+	return this
+}
+```
+
+修改 `main.go`
+
+```go
+package main
+
+import (
+	. "gin-up/src/classes"
+	"gin-up/src/goft"
+	. "gin-up/src/middlewares"
+)
+
+func main() {
+	goft.Ignite().
+		Attach(NewUserMid()).
+		Mount("v1", NewIndexClass(),
+			NewUserClass()).
+		Mount("v2", NewIndexClass()).
+		Launch()
+}
+```
+
+运行程序访问 http://localhost:8080/v1/ 可以看到还是相同的效果，控制台显示 `这是新的用户中间件`
+
+测试发生错误时的显示，先修改 `src/middlewares/UserMid.go`
+
+```go
+package middlewares
+
+import "fmt"
+
+// UserMid 用户中间件，"继承" Fairing 接口
+type UserMid struct{}
+
+func NewUserMid() *UserMid {
+	return &UserMid{}
+}
+
+// OnRequest 在请求进入时，可以处理一些业务逻辑，或控制
+func (this *UserMid) OnRequest() error {
+	fmt.Println("这是新的用户中间件")
+	return fmt.Errorf("强制执行错误")
+}
+```
+
+访问 http://localhost:8080/v1/ 返回 `{ "error": "强制执行错误" }`，控制台还是显示 `这是新的用户中间件`
+
+代码变动 [git commit]() 

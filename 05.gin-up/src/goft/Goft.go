@@ -24,6 +24,19 @@ func (this *Goft) Handle(httpMethod, relativePath string, handlers ...gin.Handle
 	return this
 }
 
+// Attach 实现中间件的加入
+func (this *Goft) Attach(f Fairing) *Goft {
+	this.Use(func(c *gin.Context) {
+		err := f.OnRequest()
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.Next() // 继续往下执行
+		}
+	})
+	return this
+}
+
 // Mount 挂载控制器，定义接口，控制器继承接口就可以传进来
 func (this *Goft) Mount(group string, classes ...IClass) *Goft {
 	this.g = this.Group(group)
