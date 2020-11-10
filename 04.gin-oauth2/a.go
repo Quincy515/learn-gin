@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gin-oauth2/utils"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 )
@@ -37,14 +38,19 @@ func main() {
 		})
 	})
 	r.GET("/getcode", func(c *gin.Context) {
-		code, _ := c.GetQuery("code")
-		//c.JSON(200, gin.H{"code": code})
-		token, err := oauth2Config.Exchange(c, code)
+		code, _ := c.GetQuery("code")                // 得到授权码
+		token, err := oauth2Config.Exchange(c, code) // 请求 token
 		if err != nil {
 			c.JSON(400, gin.H{"message": err.Error()})
 		} else {
 			c.JSON(200, token)
 		}
+	})
+	r.GET("/info", func(c *gin.Context) {
+		token := c.Query("token")
+		ret := utils.GetUserInfo(authServerURL+"/info", token, true)
+		c.Writer.Header().Add("Content-type", "application/json")
+		c.String(200, ret)
 	})
 	r.Run(":8080")
 }

@@ -493,4 +493,130 @@ func userAuthorizationHandler(w http.ResponseWriter, r *http.Request) (userID st
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/d2280d2bd5666b7fa5d14438f6a0b1457c7fd48d#diff-da6e607e95bad42ffe69d9ebe05a342ad7ac388011ff6371da7515533a4d50f6L2)
+
+### 05. 客户端使用token获取用户信息
+
+在服务端 `s.go` 中增加使用token获取用户信息的路由 `POST /info`
+
+```go
+	// 根据 token 返回用户信息
+	r.POST("/info", func(c *gin.Context) {
+		token, err := srv.ValidationBearerToken(c.Request)
+		if err != nil {
+			panic(err.Error())
+		}
+		ret := gin.H{
+			"user_id": token.GetUserID(),
+			"expire": int64(token.GetAccessCreateAt().
+				Add(token.GetAccessExpiresIn()).
+				Sub(time.Now()).Seconds())}
+		c.JSON(200, ret)
+	})
+```
+
+客户端请求用户信息的方式
+
+OAuth 2.0 定义了获取 Access Token 的方法
+
+第一种 :放在头里
+
+```http
+GET /info  HTTP/1.1
+Host: server.example.com
+Authorization: Bearer xxxxxooo
+```
+
+先通过 http://localhost:8080 点击第三方登录跳转到 服务端登录页面，登录成功后跳转回 http://localhost:8080/getcode?code=Y2QZMTFKYZYTZMQ1ZC0ZYJI0LTLJNGETZDM2NJZHMDJMNDC2&state=myclient，可以看到返回的 json
+
+```json
+{
+    "access_token": "OTLIMGRLNWUTNWYYNC0ZZJLJLTHIZJQTMMUZMDQ1ZTLJYTZM",
+    "token_type": "Bearer",
+    "refresh_token": "NWRHYMQ2NDGTNWU4MC01YWJILWI0ZTATMJYZNGIWMZIXYZFM",
+    "expiry": "2020-11-10T12:22:01.3254618+08:00"
+}
+```
+
+发送 POST 请求
+
+<img src="../imgs/14_token.png" style="zoom:95%;" />
+
+第二种：放到Form参数里
+
+```http
+Content-Type: application/x-www-form-urlencoded
+access_token=xxoxooxoo
+```
+
+<img src="../imgs/15_token.png" style="zoom:95%;" />
+
+客户端可以请求`GET /info?access_token=`  修改代码  `a.go`
+
+```go
+	// 根据 token 返回用户信息
+	r.POST("/info", func(c *gin.Context) {
+		token, err := srv.ValidationBearerToken(c.Request)
+		if err != nil {
+			panic(err.Error())
+		}
+		ret := gin.H{
+			"user_id": token.GetUserID(),
+			"expire": int64(token.GetAccessCreateAt().
+				Add(token.GetAccessExpiresIn()).
+				Sub(time.Now()).Seconds())}
+		c.JSON(200, ret)
+	})
+```
+
+客户端写 `http.Requet` 请求服务端获取用户信息 `utils/user.go`
+
+```go
+package utils
+
+import (
+	"io/ioutil"
+	"net/http"
+	"strings"
+)
+
+func GetUserInfo(url string, token string, isBearer bool) string {
+	var (
+		err  error
+		req  *http.Request
+		resp *http.Response
+	)
+	if isBearer {
+		req, err = http.NewRequest("POST", url, nil)
+		if err != nil {
+			panic(err.Error())
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+	} else {
+		req, err = http.NewRequest("POST", url, strings.NewReader("access_token="+token))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err.Error())
+	}
+	defer resp.Body.Close()
+	b, _ := ioutil.ReadAll(resp.Body)
+	return string(b)
+}
+```
+
+直接在浏览器访问 http://localhost:8080/info?token=MMVJYJU1ZWMTZGQ1YI0ZNZBILTHIOTMTYMFIZMIXOWUYNMJM 就可以查看到用户信息
+
+```json
+{
+    "expire": 7032,
+    "user_id": "custer"
+}
+```
+
 代码变动 [git commit]()
+

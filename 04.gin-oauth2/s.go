@@ -9,6 +9,7 @@ import (
 	"github.com/go-oauth2/oauth2/v4/store"
 	"log"
 	"net/http"
+	"time"
 )
 
 var srv *server.Server
@@ -41,12 +42,14 @@ func main() {
 			log.Println(err)
 		}
 	})
+	// 根据授权码获取 token
 	r.POST("/token", func(c *gin.Context) {
 		err := srv.HandleTokenRequest(c.Writer, c.Request)
 		if err != nil {
 			panic(err.Error())
 		}
 	})
+	// 如果没有登录，则跳转登录界面
 	r.Any("/login", func(c *gin.Context) {
 		data := map[string]string{
 			"error": "",
@@ -63,6 +66,19 @@ func main() {
 			}
 		}
 		c.HTML(200, "login.html", data)
+	})
+	// 根据 token 返回用户信息
+	r.POST("/info", func(c *gin.Context) {
+		token, err := srv.ValidationBearerToken(c.Request)
+		if err != nil {
+			panic(err.Error())
+		}
+		ret := gin.H{
+			"user_id": token.GetUserID(),
+			"expire": int64(token.GetAccessCreateAt().
+				Add(token.GetAccessExpiresIn()).
+				Sub(time.Now()).Seconds())}
+		c.JSON(200, ret)
 	})
 	r.LoadHTMLGlob("public/*.html")
 	r.Run(":8081")
