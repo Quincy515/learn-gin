@@ -509,10 +509,10 @@ import (
 
 func main() {
 	goft.Ignite().
-		Attach(NewUserMid()).
-		Mount("v1", NewIndexClass(),
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
 			NewUserClass()).
-		Mount("v2", NewIndexClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2 
 		Launch()
 }
 ```
@@ -542,4 +542,67 @@ func (this *UserMid) OnRequest() error {
 
 访问 http://localhost:8080/v1/ 返回 `{ "error": "强制执行错误" }`，控制台还是显示 `这是新的用户中间件`
 
-代码变动 [git commit]() 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/1124273cad1142ed9507f9bc0a7bdc4ebbc2d1c4#diff-9dc2b1b9bae1a7f587f7bc524f1be8a4e736ea93f487ad5451bd110d682b8f70L3) 
+
+### 07. 中间件(2):注入上下文参数
+
+上面是中间件的简单使用，那么如何在 `UserMid.go` 中如何调用 `gin.Context` 来获取一些请求参数之类的。
+
+```go
+func (this *UserMid) OnRequest() error {
+	fmt.Println("这是新的用户中间件")
+	return nil
+}
+```
+
+在 `func (this *UserMid) OnRequest() error {` 中增加参数 `ctx *gin.Context`
+
+```go
+func (this *UserMid) OnRequest(ctx *gin.Context) error {
+	fmt.Println("这是新的用户中间件")
+	fmt.Println(ctx.Query("name")) // 测试 query 参数，如 /v1/user?name=
+	return fmt.Errorf("强制执行错误")
+}
+```
+
+首先改造接口 `src/goft/Fairing.go`
+
+```go
+package goft
+
+import "github.com/gin-gonic/gin"
+
+// Fairing 规范中间件代码和功能的接口
+type Fairing interface {
+	OnRequest(*gin.Context) error
+}
+```
+
+然后在 `src/goft/Goft.go` 中修改 `Attach()` 函数
+
+```go
+func (this *Goft) Attach(f Fairing) *Goft {
+	this.Use(func(c *gin.Context) {
+    err := f.OnRequest(c) // new: 添加参数
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.Next() // 继续往下执行
+		}
+	})
+	return this
+}
+```
+
+访问 http://localhost:8080/v1/user?name=custer 可以看到控制台输出了 
+
+```bash
+[GIN-debug] GET    /v1/                      --> gin-up/src/classes.(*IndexClass).GetIndex.func1 (2 handlers)
+[GIN-debug] GET    /v1/user                  --> gin-up/src/classes.(*UserClass).UserList.func1 (2 handlers)
+[GIN-debug] GET    /v2/                      --> gin-up/src/classes.(*IndexClass).GetIndex.func1 (2 handlers)
+[GIN-debug] Listening and serving HTTP on :8080
+这是新的用户中间件
+custer
+```
+
+代码变动 [git commit]()

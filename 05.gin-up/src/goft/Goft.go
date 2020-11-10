@@ -27,7 +27,7 @@ func (this *Goft) Handle(httpMethod, relativePath string, handlers ...gin.Handle
 // Attach 实现中间件的加入
 func (this *Goft) Attach(f Fairing) *Goft {
 	this.Use(func(c *gin.Context) {
-		err := f.OnRequest()
+		err := f.OnRequest(c)
 		if err != nil {
 			c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
 		} else {
