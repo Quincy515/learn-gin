@@ -846,4 +846,235 @@ func GetUserInfo(url string, token string, isBearer bool) *OAuthUser {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/6ca5de3db176c86d15ca3503428ffdeea7d03fe2#diff-da6e607e95bad42ffe69d9ebe05a342ad7ac388011ff6371da7515533a4d50f6L13)
+
+### 07. 演示：注册并绑定第三方账号
+
+表 `sources` 和 `users` 的`sql` 语句
+
+```sql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for sources
+-- ----------------------------
+DROP TABLE IF EXISTS `sources`;
+CREATE TABLE `sources`  (
+  `source_id` int(11) NOT NULL AUTO_INCREMENT,
+  `source_name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
+  `source_uri` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
+  PRIMARY KEY (`source_id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of sources
+-- ----------------------------
+INSERT INTO `sources` VALUES (1, 'jtthink', 'http://oauth.jtthink.com');
+INSERT INTO `sources` VALUES (2, 'github', 'http://github.com');
+
+-- ----------------------------
+-- Table structure for users
+-- ----------------------------
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE `users`  (
+  `user_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
+  `user_pwd` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
+  `user_addtime` datetime(0) NULL DEFAULT CURRENT_TIMESTAMP,
+  `source_id` int(11) NULL DEFAULT 0,
+  `source_userid` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
+  PRIMARY KEY (`user_id`) USING BTREE,
+  UNIQUE INDEX `user_name`(`user_name`) USING BTREE,
+  UNIQUE INDEX `source_idname`(`source_id`, `source_userid`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of users
+-- ----------------------------
+INSERT INTO `users` VALUES (2, 'zhangsan', '123', '2020-09-29 15:21:44', 0, 'a');
+INSERT INTO `users` VALUES (3, 'lisi', '123', '2020-09-24 15:21:11', 0, '');
+INSERT INTO `users` VALUES (6, 'wangwu', '123', '2020-10-20 00:25:45', 1, 'shenyi');
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+修改 `a.go` 
+
+```go
+	// 注册用户
+	r.Any("/user/reg", func(c *gin.Context) {
+		data := map[string]string{
+			"error":   "",
+			"message": "",
+		}
+		c.HTML(200, "reg.html", data)
+	})
+	r.GET("/github/getcode", func(c *gin.Context) {
+		//source := c.Param("source")                  // 来源
+		source := "github"
+		code, _ := c.GetQuery("code")                // 得到授权码
+		token, err := oauth2Config.Exchange(c, code) // 请求 token
+		if err != nil {
+			c.JSON(400, gin.H{"message": err.Error()})
+		} else {
+			//c.JSON(200, token)
+			// 通过第三方登录平台提交 token，获取用户在第三方平台的用户 ID
+			passport := utils.GetUserInfo(authServerURL+"/info", token.AccessToken, true)
+			user := utils.GetUserName(source, passport.UserID)
+			if user == nil {
+				//c.String(200, "您需要注册并绑定账号")
+				c.Redirect(302, "/user/reg?token="+token.AccessToken+"&source=github")
+			} else {
+				c.String(200, "您在本站的用户名是: %s", user.UserName)
+			}
+		}
+	})
+```
+
+增加了`reg.html`
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>注册用户</title>
+</head>
+<body>
+<div class="body">
+    <form method="post">
+        <div>
+            <span>用户名:</span>
+            <input type="text" name="userName"/>
+        </div>
+        <div>
+            <span>密码:</span>
+            <input type="password" name="userPass"/>
+        </div>
+        <div>
+            <span>确认密码密码:</span>
+            <input type="password" name="userPass2"/>
+        </div>
+        <div><input type="submit" value="注册"/></div>
+        <div>{{.message}}</div>
+        <div style="color: red">{{.error}}</div>
+    </form>
+</div>
+</body>
+</html>
+```
+
+完善 `a.go` 的注册代码
+
+```go
+package main
+
+import (
+	"fmt"
+	"gin-oauth2/utils"
+	"github.com/gin-gonic/gin"
+	"golang.org/x/oauth2"
+)
+
+const authServerURL = "http://127.0.0.1:8081"
+
+var (
+	oauth2Config = oauth2.Config{
+		ClientID:     "clienta",
+		ClientSecret: "123",
+		Scopes:       []string{"all"},
+		RedirectURL:  "http://localhost:8080/github/getcode",
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  authServerURL + "/auth",  // 获取授权码地址
+			TokenURL: authServerURL + "/token", // 获取 token 地址
+		},
+	}
+)
+
+func main() {
+	r := gin.Default()
+	r.LoadHTMLGlob("public/*")
+	// state 参数，传递给服务端，验证通过会原封不动的传回客户端，
+	// 在 /getcode 里理论上需要对 state 进行判断，防止被串改。
+	loginUrl := oauth2Config.AuthCodeURL("myclient")
+
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(200, "a-index.html", map[string]string{
+			"loginUrl": loginUrl,
+		})
+	})
+	// 注册用户
+	r.Any("/user/reg", func(c *gin.Context) {
+		data := map[string]string{
+			"error":   "",
+			"message": "",
+		}
+		if c.Request.Method == "POST" {
+			userID := "" // 第三方账号 ID
+			if c.Query("token") != "" {
+				passport := utils.GetUserInfo(authServerURL+"/info", c.Query("token"), true)
+				userID = passport.UserID
+			}
+			source := c.Query("source")
+			uname, upass, upass2 := c.PostForm("userName"), c.PostForm("userPass"), c.PostForm("userPass2")
+			user, err := utils.AddNewUser(uname, upass, upass2, userID, source)
+			if err != nil {
+				data["error"] = err.Error()
+			} else {
+				if userID != "" {
+					data["message"] = fmt.Sprintf("账号绑定成功,您的用户名是%s,第三方账号是:%s", user.UserName, userID)
+				} else {
+					data["message"] = fmt.Sprintf("账号创建成功,您的用户名是%s", user.UserName)
+				}
+			}
+		}
+		c.HTML(200, "reg.html", data)
+	})
+	r.GET("/github/getcode", func(c *gin.Context) {
+		//source := c.Param("source")                  // 来源
+		source := "github"
+		code, _ := c.GetQuery("code")                // 得到授权码
+		token, err := oauth2Config.Exchange(c, code) // 请求 token
+		if err != nil {
+			c.JSON(400, gin.H{"message": err.Error()})
+		} else {
+			//c.JSON(200, token)
+			// 通过第三方登录平台提交 token，获取用户在第三方平台的用户 ID
+			passport := utils.GetUserInfo(authServerURL+"/info", token.AccessToken, true)
+			user := utils.GetUserName(source, passport.UserID)
+			if user == nil {
+				//c.String(200, "您需要注册并绑定账号")
+				c.Redirect(302, "/user/reg?token="+token.AccessToken+"&source=github")
+			} else {
+				c.String(200, "您在本站的用户名是: %s", user.UserName)
+			}
+		}
+	})
+	r.Run(":8080")
+}
+```
+
+增加 `utils/userrepo.go` 文件的 `AddNewUser()` 函数
+
+```go
+func AddNewUser(userName string , pwd1 string,pwd2 string,userID string,sourceName string ) (*models.UserModel,error) {
+	if pwd1!=pwd2{
+		return nil,fmt.Errorf("密码不一致")
+	}
+	source:=&models.Source{}
+	if sourceName!=""{ //说明有来源， 则要判断。否则不判断
+		if err:=Gorm.Table("sources").Where("source_name=?",sourceName).First(source).Error;err!=nil{
+			return nil,fmt.Errorf("来源不合法:%s",err.Error())
+		}
+	}
+	user:=&models.UserModel{UserName:userName,UserPwd:pwd1,SourceID:source.SourceID,SourceUserId:userID}
+	if err:=Gorm.Table("users").Create(user).Error;err!=nil{
+		return nil ,fmt.Errorf("注册用户失败:%s",err.Error())
+	}else{
+		return user,nil
+	}
+}
+```
+
 代码变动 [git commit]()

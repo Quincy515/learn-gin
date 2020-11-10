@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"gin-oauth2/utils"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
@@ -37,8 +38,36 @@ func main() {
 			"loginUrl": loginUrl,
 		})
 	})
-	r.GET("/:source/getcode", func(c *gin.Context) {
-		source := c.Param("source")                  // 来源
+	// 注册用户
+	r.Any("/user/reg", func(c *gin.Context) {
+		data := map[string]string{
+			"error":   "",
+			"message": "",
+		}
+		if c.Request.Method == "POST" {
+			userID := "" // 第三方账号 ID
+			if c.Query("token") != "" {
+				passport := utils.GetUserInfo(authServerURL+"/info", c.Query("token"), true)
+				userID = passport.UserID
+			}
+			source := c.Query("source")
+			uname, upass, upass2 := c.PostForm("userName"), c.PostForm("userPass"), c.PostForm("userPass2")
+			user, err := utils.AddNewUser(uname, upass, upass2, userID, source)
+			if err != nil {
+				data["error"] = err.Error()
+			} else {
+				if userID != "" {
+					data["message"] = fmt.Sprintf("账号绑定成功,您的用户名是%s,第三方账号是:%s", user.UserName, userID)
+				} else {
+					data["message"] = fmt.Sprintf("账号创建成功,您的用户名是%s", user.UserName)
+				}
+			}
+		}
+		c.HTML(200, "reg.html", data)
+	})
+	r.GET("/github/getcode", func(c *gin.Context) {
+		//source := c.Param("source")                  // 来源
+		source := "github"
 		code, _ := c.GetQuery("code")                // 得到授权码
 		token, err := oauth2Config.Exchange(c, code) // 请求 token
 		if err != nil {
@@ -49,7 +78,8 @@ func main() {
 			passport := utils.GetUserInfo(authServerURL+"/info", token.AccessToken, true)
 			user := utils.GetUserName(source, passport.UserID)
 			if user == nil {
-				c.String(200, "您需要注册并绑定账号")
+				//c.String(200, "您需要注册并绑定账号")
+				c.Redirect(302, "/user/reg?token="+token.AccessToken+"&source=github")
 			} else {
 				c.String(200, "您在本站的用户名是: %s", user.UserName)
 			}

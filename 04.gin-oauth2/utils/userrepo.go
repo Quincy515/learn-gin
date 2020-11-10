@@ -24,3 +24,21 @@ func GetUserName(sourceName string, sourceUserID string) *models.UserModel {
 		return userModel
 	}
 }
+
+func AddNewUser(userName string , pwd1 string,pwd2 string,userID string,sourceName string ) (*models.UserModel,error) {
+	if pwd1!=pwd2{
+		return nil,fmt.Errorf("密码不一致")
+	}
+	source:=&models.Source{}
+	if sourceName!=""{ //说明有来源， 则要判断。否则不判断
+		if err:=Gorm.Table("sources").Where("source_name=?",sourceName).First(source).Error;err!=nil{
+			return nil,fmt.Errorf("来源不合法:%s",err.Error())
+		}
+	}
+	user:=&models.UserModel{UserName:userName,UserPwd:pwd1,SourceID:source.SourceID,SourceUserId:userID}
+	if err:=Gorm.Table("users").Create(user).Error;err!=nil{
+		return nil ,fmt.Errorf("注册用户失败:%s",err.Error())
+	}else{
+		return user,nil
+	}
+}
