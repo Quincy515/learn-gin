@@ -36,3 +36,17 @@ func GetUserSession(r *http.Request) string {
 	}
 	return ""
 }
+
+// DeleteUserSession oauth2 服务端使用： 删除当前session
+func DeleteUserSession(c *gin.Context) {
+	s, err := sessionStore.Get(c.Request, "LoginUser")
+	if err == nil {
+		s.Options.MaxAge = -1             // 清除 session
+		err = s.Save(c.Request, c.Writer) // 保存操作
+		if err != nil {
+			panic(err.Error())
+		}
+	} else {
+		panic(err.Error())
+	}
+}

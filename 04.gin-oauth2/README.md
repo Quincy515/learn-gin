@@ -1077,4 +1077,59 @@ func AddNewUser(userName string , pwd1 string,pwd2 string,userID string,sourceNa
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/b3d597e2cae900ce7b0f27da1ff6befac5fd8430#diff-da6e607e95bad42ffe69d9ebe05a342ad7ac388011ff6371da7515533a4d50f6L1)
+
+### 退出登录，清除 session
+
+服务端 `s.go`
+
+```go
+	// 注销 token
+	r.GET("/logout", func(c *gin.Context) {
+		token, err := srv.Manager.LoadAccessToken(c, c.Query("access_token"))
+		if err != nil {
+			panic(err.Error())
+			return
+		}
+		utils.DeleteUserSession(c)
+		err = manager.RemoveAccessToken(c, token.GetAccess())
+		if err != nil {
+			panic(err.Error())
+			return
+		}
+		c.Redirect(301, c.Query("redirect_uri"))
+	})
+```
+
+清除 `session` 
+
+```go
+// DeleteUserSession oauth2 服务端使用： 删除当前session
+func DeleteUserSession(c *gin.Context) {
+	s, err := sessionStore.Get(c.Request, "LoginUser")
+	if err == nil {
+		s.Options.MaxAge = -1             // 清除 session
+		err = s.Save(c.Request, c.Writer) // 保存操作
+		if err != nil {
+			panic(err.Error())
+		}
+	} else {
+		panic(err.Error())
+	}
+}
+```
+
+登录之后拿得到的 `token` 访问 `POST /info` 可以看到信息
+
+```json
+{
+    "expire": 7181,
+    "user_id": "custer"
+}
+```
+
+注销请求 `http://localhost:8081/logout?access_token=NJE4M2IZNJATMJYYMI0ZZWI5LWEYMJMTYZFJZGUYMZQ5NMEY&redirect_uri=baidu.com`
+
+再拿这个 `token` 访问 `POST /info`  `{ "message": "invalid access token" }`
+
 代码变动 [git commit]()

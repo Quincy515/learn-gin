@@ -73,12 +73,28 @@ func main() {
 		if err != nil {
 			panic(err.Error())
 		}
+		log.Println("token: ", token.GetAccess())
 		ret := gin.H{
 			"user_id": token.GetUserID(),
 			"expire": int64(token.GetAccessCreateAt().
 				Add(token.GetAccessExpiresIn()).
 				Sub(time.Now()).Seconds())}
 		c.JSON(200, ret)
+	})
+	// 注销 token
+	r.GET("/logout", func(c *gin.Context) {
+		token, err := srv.Manager.LoadAccessToken(c, c.Query("access_token"))
+		if err != nil {
+			panic(err.Error())
+			return
+		}
+		utils.DeleteUserSession(c)
+		err = manager.RemoveAccessToken(c, token.GetAccess())
+		if err != nil {
+			panic(err.Error())
+			return
+		}
+		c.Redirect(301, c.Query("redirect_uri"))
 	})
 	r.LoadHTMLGlob("public/*.html")
 	r.Run(":8081")
