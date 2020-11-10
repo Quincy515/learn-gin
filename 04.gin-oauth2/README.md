@@ -94,7 +94,7 @@ func main() {
 
 服务端代码
 
-```dago
+```go
 package main
 
 import (
@@ -207,7 +207,7 @@ func GetUserSession(r *http.Request) string {
 
 新建`middlewares.go`
 
-```,zgo
+```go
 package utils
 
 import "github.com/gin-gonic/gin"
@@ -618,5 +618,232 @@ func GetUserInfo(url string, token string, isBearer bool) string {
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/204e8f6311c52b1ef45083ba2a2ad38a5296dd05#diff-da6e607e95bad42ffe69d9ebe05a342ad7ac388011ff6371da7515533a4d50f6L1)
 
+### 06. oauth2下用户表的设计案例
+
+一般网站如果第一次使用第三方账号登录，它会跳回到原网站 a，需要注册并绑定账号。
+
+这个过程就是 a 网站和第三方网站绑定的过程。
+
+`sources` 表记录第三方账号的来源
+
+<img src="../imgs/16_sources.png" style="zoom:95%;" />
+
+`users` 用户表增加第三方账号来源
+
+<img src="../imgs/17_users.png" style="zoom:95%;" />
+
+- `source_id` : 来源 ID
+- `source_username` : 来源的用户名(或者叫做唯一标识)
+- 其中 `user_name` ：唯一索引
+- `source_id` 和 ` source_userid` :联合唯一索引
+
+注意几个规则：
+
+- 对于 自主注册的用户：`source_id` 是0 ，` source_userid `也是空的
+
+- 对于 `oauth2` 登录的用户，取到 `token` 后，请求并获取 `userid`
+
+  1、如果该用户 ID 在 `source_userid` 中找到，则自动登录
+
+   2、否则要求用户注册，并绑定该用户 ID
+
+`go get -u gorm.io/gorm` `go get gorm.io/driver/mysql`
+
+新增 `models` 目录，包含 `soures.go` 文件和 `users.go` 模型文件
+
+```go
+package models
+
+type Source struct {
+	SourceID   int    `gorm:"column:source_id"`
+	SourceName string 
+}
+```
+
+```go
+package models
+
+type UserModel struct {
+	UserID       int `gorm:"column:user_id"`
+	UserName     string
+	UserPwd      string
+	SourceID     string `gorm:"column:source_id"`
+	SourceUserId string `gorm:"column:source_userid"`
+}
+func (*UserModel) TableName() string {
+	return "users"
+}
+```
+
+在目录 `utils` 下增加文件`dbinit.go` 和  `userrepo.go`
+
+```go
+package utils
+
+import (
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"log"
+	"time"
+)
+
+var Gorm *gorm.DB
+
+func init() {
+	Gorm = gormDB()
+}
+
+func gormDB() *gorm.DB {
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	// 获取通用数据库对象 sql.DB ，然后使用其提供的功能
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
+	sqlDB.SetMaxIdleConns(10)
+	// SetMaxOpenConns 设置打开数据库连接的最大数量。
+	sqlDB.SetMaxOpenConns(100)
+	// SetConnMaxLifetime 设置了连接可复用的最大时间。
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	return db
+}
+```
+
+
+
+```go
+package utils
+
+import (
+	"fmt"
+	"gin-oauth2/models"
+)
+
+// @sourceName 来源名，需要判断是否存在
+// @sourceUserID 来源网站请求获得的 userID
+// 下面代码是为了能够演示方便，方便看懂，请自行优化
+func GetUserName(sourceName string, sourceUserID string) *models.UserModel {
+	// 1. 到 sources 表查找 sourceName 是否存在
+	source := &models.Source{}
+	if err := Gorm.Table("sources").Where("source_name=?", sourceName).First(source).Error; err != nil {
+		panic(fmt.Errorf("error source:%v", err.Error()))
+	}
+	// 2. 在用户表中查找 sourceID 和 sourceUserID
+	userModel := &models.UserModel{}
+	if err := Gorm.Table("users").Where("source_id=? and source_userid=?",
+		source.SourceID, sourceUserID).First(userModel).Error; err != nil {
+		// 代表用户没有在该网站登录
+		return nil
+	} else { // 如果存在就返回用户数据
+		return userModel
+	}
+}
+
+```
+
+我们在 a 网站点击第三方登录跳转的链接增加 `source` 来源
+
+```go
+var (
+	oauth2Config = oauth2.Config{
+		ClientID:     "clienta",
+		ClientSecret: "123",
+		Scopes:       []string{"all"},
+		RedirectURL:  "http://localhost:8080/github/getcode",
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  authServerURL + "/auth",  // 获取授权码地址
+			TokenURL: authServerURL + "/token", // 获取 token 地址
+		},
+	}
+)
+```
+
+在路由增加 `/:source/getcode` 参数
+
+```go
+	r.GET("/:source/getcode", func(c *gin.Context) {
+		source := c.Param("source")                  // 来源
+		code, _ := c.GetQuery("code")                // 得到授权码
+		token, err := oauth2Config.Exchange(c, code) // 请求 token
+		if err != nil {
+			c.JSON(400, gin.H{"message": err.Error()})
+		} else {
+			//c.JSON(200, token)
+			// 通过第三方登录平台提交 token，获取用户在第三方平台的用户 ID
+			passport := utils.GetUserInfo(authServerURL+"/info", token.AccessToken, true)
+			user := utils.GetUserName(source, passport.UserID)
+			if user == nil {
+				c.String(200, "您需要注册并绑定账号")
+			} else {
+				c.String(200, "您在本站的用户名是: %s", user.UserName)
+			}
+		}
+	})
+```
+
+通过第三方登录平台提交 token，获取用户在第三方平台的用户 ID
+
+```go
+passport := utils.GetUserInfo(authServerURL+"/info", token.AccessToken, true)
+```
+
+相应在 `utils/user.go` 中修改
+
+```go
+package utils
+
+import (
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"strings"
+)
+
+type OAuthUser struct {
+	UserID string `json:"user_id"`
+	Expire int64  `json:"expire"`
+}
+
+func GetUserInfo(url string, token string, isBearer bool) *OAuthUser {
+	var (
+		err  error
+		req  *http.Request
+		resp *http.Response
+	)
+	if isBearer {
+		req, err = http.NewRequest("POST", url, nil)
+		if err != nil {
+			panic(err.Error())
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+	} else {
+		req, err = http.NewRequest("POST", url, strings.NewReader("access_token="+token))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err.Error())
+	}
+	defer resp.Body.Close()
+	b, _ := ioutil.ReadAll(resp.Body)
+	//return string(b)
+	oauthUser := &OAuthUser{}
+	err = json.Unmarshal(b, oauthUser)
+	if err != nil {
+		panic(err.Error())
+	}
+	return oauthUser
+}
+```
+
+代码变动 [git commit]()

@@ -1,12 +1,18 @@
 package utils
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"strings"
 )
 
-func GetUserInfo(url string, token string, isBearer bool) string {
+type OAuthUser struct {
+	UserID string `json:"user_id"`
+	Expire int64  `json:"expire"`
+}
+
+func GetUserInfo(url string, token string, isBearer bool) *OAuthUser {
 	var (
 		err  error
 		req  *http.Request
@@ -31,5 +37,11 @@ func GetUserInfo(url string, token string, isBearer bool) string {
 	}
 	defer resp.Body.Close()
 	b, _ := ioutil.ReadAll(resp.Body)
-	return string(b)
+	//return string(b)
+	oauthUser := &OAuthUser{}
+	err = json.Unmarshal(b, oauthUser)
+	if err != nil {
+		panic(err.Error())
+	}
+	return oauthUser
 }

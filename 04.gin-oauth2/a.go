@@ -13,7 +13,7 @@ var (
 		ClientID:     "clienta",
 		ClientSecret: "123",
 		Scopes:       []string{"all"},
-		RedirectURL:  "http://localhost:8080/getcode",
+		RedirectURL:  "http://localhost:8080/github/getcode",
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  authServerURL + "/auth",  // 获取授权码地址
 			TokenURL: authServerURL + "/token", // 获取 token 地址
@@ -37,20 +37,29 @@ func main() {
 			"loginUrl": loginUrl,
 		})
 	})
-	r.GET("/getcode", func(c *gin.Context) {
+	r.GET("/:source/getcode", func(c *gin.Context) {
+		source := c.Param("source")                  // 来源
 		code, _ := c.GetQuery("code")                // 得到授权码
 		token, err := oauth2Config.Exchange(c, code) // 请求 token
 		if err != nil {
 			c.JSON(400, gin.H{"message": err.Error()})
 		} else {
-			c.JSON(200, token)
+			//c.JSON(200, token)
+			// 通过第三方登录平台提交 token，获取用户在第三方平台的用户 ID
+			passport := utils.GetUserInfo(authServerURL+"/info", token.AccessToken, true)
+			user := utils.GetUserName(source, passport.UserID)
+			if user == nil {
+				c.String(200, "您需要注册并绑定账号")
+			} else {
+				c.String(200, "您在本站的用户名是: %s", user.UserName)
+			}
 		}
 	})
-	r.GET("/info", func(c *gin.Context) {
-		token := c.Query("token")
-		ret := utils.GetUserInfo(authServerURL+"/info", token, true)
-		c.Writer.Header().Add("Content-type", "application/json")
-		c.String(200, ret)
-	})
+	//r.GET("/info", func(c *gin.Context) {
+	//	token := c.Query("token")
+	//	ret := utils.GetUserInfo(authServerURL+"/info", token, true)
+	//	c.Writer.Header().Add("Content-type", "application/json")
+	//	c.String(200, ret)
+	//})
 	r.Run(":8080")
 }
