@@ -8,6 +8,6 @@ import (
 func main() {
 	r := gin.New()
 	NewIndexClass(r).Build() // 路由和业务方法隐藏
-
+	NewUserClass(r).Build()
 	r.Run(":8080")
 }
