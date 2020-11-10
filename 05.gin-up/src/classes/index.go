@@ -1,16 +1,14 @@
 package classes
 
-import "github.com/gin-gonic/gin"
+import (
+	"gin-up/src/goft"
+	"github.com/gin-gonic/gin"
+)
 
-// IndexClass 嵌套 *gin.Engine
-type IndexClass struct {
-	*gin.Engine // gin.New() 创建的
-	// 嵌套，好比继承，但不是继承
-}
+type IndexClass struct{}
 
-// NewIndexClass 所谓的构造函数
-func NewIndexClass(e *gin.Engine) *IndexClass {
-	return &IndexClass{Engine: e} // 需要赋值，因为是指针
+func NewIndexClass() *IndexClass {
+	return &IndexClass{}
 }
 
 // GetIndex 业务方法，函数名根据业务而起
@@ -23,6 +21,6 @@ func (i *IndexClass) GetIndex() gin.HandlerFunc {
 }
 
 // Build 把业务的路由隐藏在 Build 函数
-func (i *IndexClass) Build() {
-	i.Handle("GET", "/", i.GetIndex())
+func (i *IndexClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/", i.GetIndex())
 }

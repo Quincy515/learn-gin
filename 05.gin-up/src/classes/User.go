@@ -1,15 +1,16 @@
 package classes
 
-import "github.com/gin-gonic/gin"
+import (
+	"gin-up/src/goft"
+	"github.com/gin-gonic/gin"
+)
 
-// UserClass *gin.Engine 的嵌套
-type UserClass struct {
-	*gin.Engine
-}
+// UserClass 
+type UserClass struct {}
 
 // NewUserClass UserClass generate constructor
-func NewUserClass(engine *gin.Engine) *UserClass {
-	return &UserClass{Engine: engine}
+func NewUserClass() *UserClass {
+	return &UserClass{}
 }
 
 // UserList 控制器方法
@@ -21,6 +22,6 @@ func (this *UserClass) UserList() gin.HandlerFunc {
 	}
 }
 
-func (this *UserClass) Build() {
-	this.Handle("GET", "/user", this.UserList())
+func (this *UserClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/user", this.UserList())
 }

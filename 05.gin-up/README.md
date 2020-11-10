@@ -143,4 +143,175 @@ func (this *UserClass) Build() {
 
 最后在 `main.go` 中调用 `NewUserClass(r).Build()`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/64c4800eb89dc38914dca1c1f3aba11a1b880187#diff-8d9e1f78703b2eb32787b5d6fcdc6da3201ad241fb4c572b6bbe8eb8284031e3R1)
+
+### 04. 封装 gin 成自己的框架 goft
+
+现在 `main.go` 的代码形式是
+
+```go
+func main() {
+	r := gin.New()
+	NewIndexClass(r).Build() // 路由和业务方法隐藏
+	NewUserClass(r).Build() // 控制器
+	r.Run(":8080")
+}
+```
+
+还有一些问题：
+
+1. 如果控制器多了，代码还是冗余
+2. 各个控制器代码之前，没有约束(没有接口规范)
+
+新建目录 `src\goft` 和文件 `Goft.go`
+
+```go
+package goft
+
+import "github.com/gin-gonic/gin"
+
+// Goft 嵌套 *gin.Engine
+type Goft struct {
+	*gin.Engine
+}
+
+// Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
+func Ignite() *Goft {
+	return &Goft{Engine: gin.New()}
+}
+
+// Launch 最终启动函数，相当于 r.Run()
+func (this *Goft) Launch() {
+	this.Run(":8080")
+}
+
+// Mount 挂载控制器，定义接口，接口里的方法作为参数，控制器实现接口就可以传进来
+func (this *Goft) Mount() {
+
+}
+```
+
+在 `src/goft` 目录下新建 `IClass.go` 文件，定义接口
+
+```go
+package goft
+
+type IClass struct {
+	Build(goft *Goft)
+}
+```
+
+修改业务控制器 `src/classes/User.go` 代码，删除 `*gin.Engine`，
+
+使得业务控制器和服务器没有强关联，否则耦合太高。
+
+```go
+// UserClass 
+type UserClass struct {}
+
+// NewUserClass UserClass generate constructor
+func NewUserClass() *UserClass {
+	return &UserClass{}
+}
+```
+
+控制器生成方法 `Build()` 修改传入参数，这样就实现了 `IClass` 接口
+
+```go
+func (this *UserClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/user", this.UserList())
+}
+```
+
+在 `Mount()` 函数里就可以传入参数
+
+```go
+func (this *Goft) Mount(classes ...IClass) *Goft {
+	for _, class := range classes {
+		class.Build(this) 
+	}
+    return this
+}
+```
+
+返回自己 `*Goft` 是为了链式调用。同样的修改 `src/classes/Index.go`
+
+```go
+package classes
+
+import (
+	"gin-up/src/goft"
+	"github.com/gin-gonic/gin"
+)
+
+type IndexClass struct{}
+
+func NewIndexClass() *IndexClass {
+	return &IndexClass{}
+}
+
+// GetIndex 业务方法，函数名根据业务而起
+func (i *IndexClass) GetIndex() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"result": "index ok",
+		})
+	}
+}
+
+// Build 把业务的路由隐藏在 Build 函数
+func (i *IndexClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/", i.GetIndex())
+}
+```
+
+在 `main.go` 中调用
+
+```go
+package main
+
+import (
+	. "gin-up/src/classes"
+	"gin-up/src/goft"
+)
+
+func main() {
+	goft.Ignite().Mount(NewIndexClass(), NewUserClass()).Launch()
+}
+```
+
+最终的 `src/goft/Goft.go` 代码
+
+```go
+package goft
+
+import "github.com/gin-gonic/gin"
+
+// Goft 嵌套 *gin.Engine
+type Goft struct {
+	*gin.Engine
+}
+
+// Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
+func Ignite() *Goft {
+	return &Goft{Engine: gin.New()}
+}
+
+// Launch 最终启动函数，相当于 r.Run()
+func (this *Goft) Launch() {
+	this.Run(":8080")
+}
+
+// Mount 挂载控制器，定义接口，控制器继承接口就可以传进来
+func (this *Goft) Mount(classes ...IClass) *Goft {
+	for _, class := range classes {
+		class.Build(this)
+	}
+	return this
+}
+```
+
 代码变动 [git commit]()
+
+
+
