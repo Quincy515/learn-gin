@@ -1132,4 +1132,4 @@ func DeleteUserSession(c *gin.Context) {
 
 再拿这个 `token` 访问 `POST /info`  `{ "message": "invalid access token" }`
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/086704defc7507b41fb1220e6a3c91cb2b699114#diff-0a21b2104f7ddb8af8e0d4b2538ff608acbf5988a14c4c2ef561e296fe49676fL73)
