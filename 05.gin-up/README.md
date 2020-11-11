@@ -1660,7 +1660,7 @@ type UserModel struct {
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/0459a5d97549c21f2a497a04226cbbe16100ba38#diff-8d9e1f78703b2eb32787b5d6fcdc6da3201ad241fb4c572b6bbe8eb8284031e3L9)
 
 
 
