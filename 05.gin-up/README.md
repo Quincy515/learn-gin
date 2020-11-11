@@ -1344,6 +1344,174 @@ type UserClass struct {
 }
  ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/08d73e7a383e7d648f433b5f2b9393ca7dea925a#diff-8d9e1f78703b2eb32787b5d6fcdc6da3201ad241fb4c572b6bbe8eb8284031e3L1)
 
+### 14. ORM和控制器的整合技巧(下)
+
+改造 `Goft` 
+
+```go
+type Goft struct {
+	*gin.Engine                  // 把 *gin.Engine 放入主类里
+	g           *gin.RouterGroup // 保存 group 对象
+	dba         interface{}      // 保存和执行 *gorm.DB 对象
+}
+```
+
+修改为切片
+
+```go
+type Goft struct {
+	*gin.Engine                  // 把 *gin.Engine 放入主类里
+	g           *gin.RouterGroup // 保存 group 对象
+	props       []interface{}
+}
+```
+
+于是在数据库连接对象时需要修改
+
+```go
+func (this *Goft) DB(dba interface{}) *Goft {
+	this.props = append(this.props, dba)
+	return this
+}
+```
+
+注意切片需要初始化，否则是 `nil`
+
+```go
+func Ignite() *Goft {
+	g := &Goft{Engine: gin.New(), props: make([]interface{}, 0)}
+	g.Use(ErrorHandler()) // 必须强制加载异常处理中间件
+	return g
+}
+```
+
+修改代码
+
+```go
+func (this *Goft) Mount(group string, classes ...IClass) *Goft {
+	this.g = this.Group(group)
+	for _, class := range classes {
+		class.Build(this)
+		// reflect.ValueOf(class) 是指针，reflect.ValueOf(class) 是指针指向的对象
+		vClass := reflect.ValueOf(class).Elem()
+		if vClass.NumField() > 0 { // vClass 的属性个数
+			if this.dba != nil { // 并且 *Goft 中有数据库对象
+				// vClass.Field(0)是强制使用第一个属性的指针，使用 Set() 进行赋值完成初始化
+				// vClass.Field(0).Type() --> 指针 *GormAdapter
+				// vClass.Field(0).Type().Elem() -->指针指向的对象 GormAdapter
+				// reflect.New(vClass.Field(0).Type().Elem()) --> new 指针 *GormAdapter
+				vClass.Field(0).Set(reflect.New(vClass.Field(0).Type().Elem()))
+				// Elem() 是指针指向的对象 Set() 是进行赋值
+				vClass.Field(0).Elem().Set(reflect.ValueOf(this.dba).Elem())
+			}
+		}
+	}
+	return this
+}
+```
+
+为
+
+```go
+package goft
+
+import (
+	"github.com/gin-gonic/gin"
+	"reflect"
+)
+
+// Goft
+type Goft struct {
+	*gin.Engine                  // 把 *gin.Engine 放入主类里
+	g           *gin.RouterGroup // 保存 group 对象
+	props       []interface{}
+	//dba         interface{}      // 保存和执行 *gorm.DB 对象
+}
+
+// Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
+func Ignite() *Goft {
+	g := &Goft{Engine: gin.New(), props: make([]interface{}, 0)}
+	g.Use(ErrorHandler()) // 必须强制加载异常处理中间件
+	return g
+}
+
+// Launch 最终启动函数，相当于 r.Run()
+func (this *Goft) Launch() {
+	this.Run(":8080")
+}
+
+// Handle 重载 gin.Handle 函数
+func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *Goft {
+	if h := Convert(handler); h != nil {
+		this.g.Handle(httpMethod, relativePath, h)
+	}
+	return this
+}
+
+// Attach 实现中间件的加入
+func (this *Goft) Attach(f Fairing) *Goft {
+	this.Use(func(c *gin.Context) {
+		err := f.OnRequest(c)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.Next() // 继续往下执行
+		}
+	})
+	return this
+}
+
+// DB 设定数据库连接对象
+func (this *Goft) DB(dba interface{}) *Goft {
+	this.props = append(this.props, dba)
+	return this
+}
+
+// Mount 挂载控制器，定义接口，控制器继承接口就可以传进来
+func (this *Goft) Mount(group string, classes ...IClass) *Goft {
+	this.g = this.Group(group)
+	for _, class := range classes {
+		class.Build(this)
+		this.setProp(class)
+	}
+	return this
+}
+
+// getProp 获取属性
+func (this *Goft) getProp(t reflect.Type) interface{} {
+	for _, p := range this.props {
+		if t == reflect.TypeOf(p) {
+			return p
+		}
+	}
+	return nil
+}
+
+// setProp 赋值
+func (this *Goft) setProp(class IClass) {
+	// reflect.ValueOf(class) 是指针，reflect.ValueOf(class) 是指针指向的对象
+	vClass := reflect.ValueOf(class).Elem()  // 反射
+	for i := 0; i < vClass.NumField(); i++ { // 遍历 vClass 的属性
+		f := vClass.Field(i)                       // 判断属性是否已经初始化
+		if !f.IsNil() || f.Kind() != reflect.Ptr { // 如果控制器已经初始化或者不是指针
+			continue // 就跳过
+		}
+		if p := this.getProp(f.Type()); p != nil {
+			// vClass.Field(0)是强制使用第一个属性的指针，使用 Set() 进行赋值完成初始化
+			// vClass.Field(0).Type() --> 指针 *GormAdapter
+			// vClass.Field(0).Type().Elem() -->指针指向的对象 GormAdapter
+			// reflect.New(vClass.Field(0).Type().Elem()) --> new 指针 *GormAdapter
+			// vClass.Field(0).Set(reflect.New(vClass.Field(0).Type().Elem()))
+			// Elem() 是指针指向的对象 Set() 是进行赋值
+			// vClass.Field(0).Elem().Set(reflect.ValueOf(this.dba).Elem())
+			f.Set(reflect.New(f.Type().Elem()))     // 初始化
+			f.Elem().Set(reflect.ValueOf(p).Elem()) // 赋值
+		}
+	}
+}
+```
+
+代码变动 [git commit]()
 

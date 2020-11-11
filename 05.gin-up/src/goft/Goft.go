@@ -9,12 +9,13 @@ import (
 type Goft struct {
 	*gin.Engine                  // 把 *gin.Engine 放入主类里
 	g           *gin.RouterGroup // 保存 group 对象
-	dba         interface{}      // 保存和执行 *gorm.DB 对象
+	props       []interface{}
+	//dba         interface{}      // 保存和执行 *gorm.DB 对象
 }
 
 // Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
 func Ignite() *Goft {
-	g := &Goft{Engine: gin.New()}
+	g := &Goft{Engine: gin.New(), props: make([]interface{}, 0)}
 	g.Use(ErrorHandler()) // 必须强制加载异常处理中间件
 	return g
 }
@@ -47,7 +48,7 @@ func (this *Goft) Attach(f Fairing) *Goft {
 
 // DB 设定数据库连接对象
 func (this *Goft) DB(dba interface{}) *Goft {
-	this.dba = dba
+	this.props = append(this.props, dba)
 	return this
 }
 
@@ -56,19 +57,40 @@ func (this *Goft) Mount(group string, classes ...IClass) *Goft {
 	this.g = this.Group(group)
 	for _, class := range classes {
 		class.Build(this)
-		// reflect.ValueOf(class) 是指针，reflect.ValueOf(class) 是指针指向的对象
-		vClass := reflect.ValueOf(class).Elem()
-		if vClass.NumField() > 0 { // vClass 的属性个数
-			if this.dba != nil { // 并且 *Goft 中有数据库对象
-				// vClass.Field(0)是强制使用第一个属性的指针，使用 Set() 进行赋值完成初始化
-				// vClass.Field(0).Type() --> 指针 *GormAdapter
-				// vClass.Field(0).Type().Elem() -->指针指向的对象 GormAdapter
-				// reflect.New(vClass.Field(0).Type().Elem()) --> new 指针 *GormAdapter
-				vClass.Field(0).Set(reflect.New(vClass.Field(0).Type().Elem()))
-				// Elem() 是指针指向的对象 Set() 是进行赋值
-				vClass.Field(0).Elem().Set(reflect.ValueOf(this.dba).Elem())
-			}
-		}
+		this.setProp(class)
 	}
 	return this
+}
+
+// getProp 获取属性
+func (this *Goft) getProp(t reflect.Type) interface{} {
+	for _, p := range this.props {
+		if t == reflect.TypeOf(p) {
+			return p
+		}
+	}
+	return nil
+}
+
+// setProp 赋值
+func (this *Goft) setProp(class IClass) {
+	// reflect.ValueOf(class) 是指针，reflect.ValueOf(class) 是指针指向的对象
+	vClass := reflect.ValueOf(class).Elem()  // 反射
+	for i := 0; i < vClass.NumField(); i++ { // 遍历 vClass 的属性
+		f := vClass.Field(i)                       // 判断属性是否已经初始化
+		if !f.IsNil() || f.Kind() != reflect.Ptr { // 如果控制器已经初始化或者不是指针
+			continue // 就跳过
+		}
+		if p := this.getProp(f.Type()); p != nil {
+			// vClass.Field(0)是强制使用第一个属性的指针，使用 Set() 进行赋值完成初始化
+			// vClass.Field(0).Type() --> 指针 *GormAdapter
+			// vClass.Field(0).Type().Elem() -->指针指向的对象 GormAdapter
+			// reflect.New(vClass.Field(0).Type().Elem()) --> new 指针 *GormAdapter
+			// vClass.Field(0).Set(reflect.New(vClass.Field(0).Type().Elem()))
+			// Elem() 是指针指向的对象 Set() 是进行赋值
+			// vClass.Field(0).Elem().Set(reflect.ValueOf(this.dba).Elem())
+			f.Set(reflect.New(f.Type().Elem()))     // 初始化
+			f.Elem().Set(reflect.ValueOf(p).Elem()) // 赋值
+		}
+	}
 }
