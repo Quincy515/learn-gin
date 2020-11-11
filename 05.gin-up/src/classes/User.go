@@ -1,13 +1,16 @@
 package classes
 
 import (
+	"fmt"
 	"gin-up/src/goft"
 	"gin-up/src/models"
 	"github.com/gin-gonic/gin"
 )
 
 // UserClass 
-type UserClass struct{}
+type UserClass struct {
+	*goft.GormAdapter
+}
 
 // NewUserClass UserClass generate constructor
 func NewUserClass() *UserClass {
@@ -34,6 +37,9 @@ func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
 	user := models.NewUserModel()
 	err := c.BindUri(user)
 	goft.Error(err, "ID 参数不合法") // 如果出错会发生 panic，然后在中间件中处理返回 400
+	res := this.Table(user.TableName()).
+		Where("user_id=?", user.UserID).Find(user)
+	fmt.Println(res.Error)
 	return user
 }
 

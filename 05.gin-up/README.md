@@ -1097,4 +1097,253 @@ func Ignite() *Goft {
 
 运行代码访问浏览器 http://localhost:8080/v1/user/123abc 可以看到 `{"error":"ID 参数不合法"}`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/49b75845d23bdf75e92480b7764fd6ac3934191b#diff-8d9e1f78703b2eb32787b5d6fcdc6da3201ad241fb4c572b6bbe8eb8284031e3L31)
+
+### 13. ORM和控制器的整合技巧(上)
+
+使用 `gorm` 连接 `MySQL` 数据库，在 `src/goft` 目录下新建文件  `GormAdapter.go` 来建立数据库连接。
+
+```go
+package goft
+
+import (
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"log"
+	"time"
+)
+
+type GormAdapter struct {
+	*gorm.DB
+}
+
+func NewGormAdapter() *GormAdapter {
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	// 获取通用数据库对象 sql.DB ，然后使用其提供的功能
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := sqlDB.Ping(); err == nil {
+		log.Println("数据库连接成功")
+	}
+	// SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
+	sqlDB.SetMaxIdleConns(10)
+	// SetMaxOpenConns 设置打开数据库连接的最大数量。
+	sqlDB.SetMaxOpenConns(100)
+	// SetConnMaxLifetime 设置了连接可复用的最大时间。
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	return &GormAdapter{DB: db}
+}
+```
+
+然后在用户控制器 `src/classes/User.go` 中调用数据库，只需要在 `UserClass` 嵌套 `*GormAdapter` 
+
+```go
+type UserClass struct{
+	*GormAdapter
+}
+```
+
+就可以在控制器中直接使用 `this.` 调用 `orm`
+
+```go
+func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
+	user := models.NewUserModel()
+	err := c.BindUri(user)
+	goft.Error(err, "ID 参数不合法") // 如果出错会发生 panic，然后在中间件中处理返回 400
+	res:=this.Table(user.TableName()).
+		Where("user_id=?", user.UserID).Find(user)
+	fmt.Println(res.Error)
+	return user
+}
+```
+
+此时运行程序访问 http://localhost:8080/v1/user/1 可以看到发生了错误
+
+```json
+{
+    "error": "invalid memory address or nil pointer dereference"
+}
+```
+
+因为这个时候 `*GormAdapter` 仅仅被嵌套，并没有被初始化，
+
+在 `src/goft/Goft.go` 中 `Mount()` 函数挂载的是当前控制器对象，所有控制器都是继承 `IClass` 接口。
+
+这里需要对控制器的属性 `type UserClass struct{ *GormAdapter }` 进行初始化，
+
+而 `IClass` 接口只有 `Build()` 方法，所以需要使用反射对控制器属性进行赋值。
+
+首先先保存数据库对象
+
+```go
+type Goft struct {
+	*gin.Engine                  // 把 *gin.Engine 放入主类里
+	g           *gin.RouterGroup // 保存 group 对象
+	dba         interface{}      // 保存和执行数据库对象
+}
+```
+
+新增方法 `DB`，用来设定数据库连接对象，可以使用 `gorm` `xorm` 等等
+
+```
+// DB 设定数据库连接对象
+func (this *Goft) DB(dba interface{}) *Goft {
+	this.dba = dba
+	return this
+}
+```
+
+然后在 `main.go` 中**设定数据库对象，初始化数据库**
+
+```go
+func main() {
+	goft.Ignite().
+		DB(goft.NewGormAdapter()). // 设定数据库对象，初始化数据库
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
+			NewUserClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Launch()
+}
+```
+
+这样设定了数据库对象之后，`Goft.dba` 中就有了值，然后对控制器实例化对象。
+
+使用反射完成控制器对象的初始化和赋值
+
+```go
+// Mount 挂载控制器，定义接口，控制器继承接口就可以传进来
+func (this *Goft) Mount(group string, classes ...IClass) *Goft {
+	this.g = this.Group(group)
+	for _, class := range classes {
+		class.Build(this)
+		// reflect.ValueOf(class) 是指针，reflect.ValueOf(class) 是指针指向的对象
+		vClass := reflect.ValueOf(class).Elem()
+		if vClass.NumField() > 0 { // vClass 的属性个数
+			if this.dba != nil { // 并且 *Goft 中有数据库对象
+				// vClass.Field(0)是强制使用第一个属性的指针，使用 Set() 进行赋值完成初始化
+				// vClass.Field(0).Type() --> 指针 *GormAdapter
+				// vClass.Field(0).Type().Elem() -->指针指向的对象 GormAdapter
+				// reflect.New(vClass.Field(0).Type().Elem()) --> new 指针 *GormAdapter
+				vClass.Field(0).Set(reflect.New(vClass.Field(0).Type().Elem()))
+				// Elem() 是指针指向的对象 Set() 是进行赋值
+				vClass.Field(0).Elem().Set(reflect.ValueOf(this.dba).Elem())
+			}
+		}
+	}
+	return this
+}
+```
+
+完整代码如下：
+
+```go
+package goft
+
+import (
+	"github.com/gin-gonic/gin"
+	"reflect"
+)
+
+// Goft
+type Goft struct {
+	*gin.Engine                  // 把 *gin.Engine 放入主类里
+	g           *gin.RouterGroup // 保存 group 对象
+	dba         interface{}      // 保存和执行 *gorm.DB 对象
+}
+
+// Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
+func Ignite() *Goft {
+	g := &Goft{Engine: gin.New()}
+	g.Use(ErrorHandler()) // 必须强制加载异常处理中间件
+	return g
+}
+
+// Launch 最终启动函数，相当于 r.Run()
+func (this *Goft) Launch() {
+	this.Run(":8080")
+}
+
+// Handle 重载 gin.Handle 函数
+func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *Goft {
+	if h := Convert(handler); h != nil {
+		this.g.Handle(httpMethod, relativePath, h)
+	}
+	return this
+}
+
+// Attach 实现中间件的加入
+func (this *Goft) Attach(f Fairing) *Goft {
+	this.Use(func(c *gin.Context) {
+		err := f.OnRequest(c)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.Next() // 继续往下执行
+		}
+	})
+	return this
+}
+
+// DB 设定数据库连接对象
+func (this *Goft) DB(dba interface{}) *Goft {
+	this.dba = dba
+	return this
+}
+
+// Mount 挂载控制器，定义接口，控制器继承接口就可以传进来
+func (this *Goft) Mount(group string, classes ...IClass) *Goft {
+	this.g = this.Group(group)
+	for _, class := range classes {
+		class.Build(this)
+		// reflect.ValueOf(class) 是指针，reflect.ValueOf(class) 是指针指向的对象
+		vClass := reflect.ValueOf(class).Elem()
+		if vClass.NumField() > 0 { // vClass 的属性个数
+			if this.dba != nil { // 并且 *Goft 中有数据库对象
+				// vClass.Field(0)是强制使用第一个属性的指针，使用 Set() 进行赋值完成初始化
+				// vClass.Field(0).Type() --> 指针 *GormAdapter
+				// vClass.Field(0).Type().Elem() -->指针指向的对象 GormAdapter
+				// reflect.New(vClass.Field(0).Type().Elem()) --> new 指针 *GormAdapter
+				vClass.Field(0).Set(reflect.New(vClass.Field(0).Type().Elem()))
+				// Elem() 是指针指向的对象 Set() 是进行赋值
+				vClass.Field(0).Elem().Set(reflect.ValueOf(this.dba).Elem())
+			}
+		}
+	}
+	return this
+}
+```
+
+这样在控制器中，如果想要使用数据库对象，就直接嵌套数据库对象就可以了
+
+```go
+type UserClass struct {
+	*goft.GormAdapter
+}
+```
+
+如果不适用数据库对象，就不用嵌套，如果使用别的 `orm` 换嵌套 `*goft.GormAdapter` 就可以
+
+```go
+type UserClass struct {
+}
+```
+
+访问 http://localhost:8080/v1/user/2 可以访问到数据库数据
+
+ ```json
+{
+    "UserID": 2,
+    "UserName": "custer"
+}
+ ```
+
 代码变动 [git commit]()
+
+

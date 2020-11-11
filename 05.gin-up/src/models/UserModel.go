@@ -3,8 +3,12 @@ package models
 import "fmt"
 
 type UserModel struct {
-	UserID   int `uri:"id" binding:"required,gt=0"`
+	UserID   int `gorm:"column:user_id" uri:"id" binding:"required,gt=0"`
 	UserName string
+}
+
+func (*UserModel) TableName() string {
+	return "users"
 }
 
 func NewUserModel() *UserModel {
