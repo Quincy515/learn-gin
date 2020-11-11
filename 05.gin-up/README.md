@@ -663,9 +663,103 @@ func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *
 
 此时访问 http://localhost:8080/v1/user 可以看到页面显示的是字符串 `abc`。
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/b4b5707b13eb76cdcf3e9555138f8fdefe737f37#diff-8d9e1f78703b2eb32787b5d6fcdc6da3201ad241fb4c572b6bbe8eb8284031e3L6)
 
 ### 09. 封装控制器的返回类型判断
 
 如果需要控制器返回的是对象切片或没有返回值，还需要进一步封装。
+
+第1步在目录 `src/goft` 下创建新文件 `Responder.go`
+
+```go
+package goft
+
+import "github.com/gin-gonic/gin"
+
+// Responder 接口目的是 gin.Handle() 的第三个参数
+type Responder interface {
+	RespondTo() gin.HandlerFunc
+}
+
+// StringResponder 把返回字符串的 gin.HandlerFunc 包装成一个类型
+type StringResponder func(*gin.Context) string
+
+func (this StringResponder) RespondTo() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.String(200, this(context))
+	}
+}
+```
+
+目的使得 `StringResponder` 代替 `func(*gin.Context) string)`  这个判断，
+
+接下来对 `handler` 进行类型的断言，看是什么类型，然后执行相关的方法，获得 `gin.HandlerFunc`。
+
+直接把 `interface{}` 断言成 `Responder` 接口是不可以的，
+
+`if h, ok := handler.(Responder); ok {}`。如果断言成 `StringResponder`  也是不可以的。
+
+这里写一个函数 `Convert()`，通过反射进行判断
+
+```go
+package goft
+
+import (
+	"github.com/gin-gonic/gin"
+	"reflect"
+)
+
+// ResponderList 切片是一堆 Responder 接口
+var ResponderList []Responder
+
+func init() {
+	ResponderList = []Responder{new(StringResponder)} // 反射不能直接使用类型，提供反射需要的指针
+}
+
+// Responder 接口目的是 gin.Handle() 的第三个参数
+type Responder interface {
+	RespondTo() gin.HandlerFunc
+}
+
+// Convert 通过反射判断 interface{] 类型断言
+func Convert(handler interface{}) gin.HandlerFunc {
+	hRef := reflect.ValueOf(handler) // handler 变成 reflect 反射对象
+	for _, r := range ResponderList {
+		rRef := reflect.ValueOf(r).Elem() // new() 的指针类型必须要执行 Elem
+		// 判断 hRef 的类型是否可以转换成 rRef 的类型
+		if hRef.Type().ConvertibleTo(rRef.Type()) {
+			rRef.Set(hRef) // 反射的方式设置值
+			return rRef.Interface().(Responder).RespondTo()
+		}
+	}
+	return nil
+}
+
+// StringResponder 把返回字符串的 gin.HandlerFunc 包装成一个类型
+type StringResponder func(*gin.Context) string
+
+// RespondTo 接口的实现
+func (this StringResponder) RespondTo() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.String(200, this(context))
+	}
+}
+```
+
+这样 `interface{}` 的断言判断就变成了 
+
+`if h := Convert(handler); h != nil { this.g.Handle(httpMethod, relativePath, h) }`
+
+```go
+func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *Goft {
+	if h := Convert(handler); h != nil {
+		this.g.Handle(httpMethod, relativePath, h)
+	}
+	return this
+}
+```
+
+后面需要扩展类型，只要再加入如 `StringResponder` 类型就可以。
+
+代码修改 [git commit]()
 

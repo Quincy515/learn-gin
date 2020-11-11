@@ -20,10 +20,8 @@ func (this *Goft) Launch() {
 
 // Handle 重载 gin.Handle 函数
 func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *Goft {
-	if h, ok := handler.(func(*gin.Context) string); ok { // 断言成功
-		this.g.Handle(httpMethod, relativePath, func(context *gin.Context) {
-			context.String(200, h(context))
-		})
+	if h := Convert(handler); h != nil {
+		this.g.Handle(httpMethod, relativePath, h)
 	}
 	return this
 }
