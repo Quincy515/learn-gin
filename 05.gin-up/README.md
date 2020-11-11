@@ -870,5 +870,113 @@ func init() {
 
 `{"UserID": 101,"UserName": "custer"}`
 
-代码修改 [git commit]()
+代码修改 [git commit](https://github.com/custer-go/learn-gin/commit/e040c9ea87ca224cecc1aefa7f82873e94afa774#diff-8d9e1f78703b2eb32787b5d6fcdc6da3201ad241fb4c572b6bbe8eb8284031e3L2)
 
+### 11. 示例:让控制器支持返回实体类切片
+
+所有返回自定义的 `struct` 一律返回值都是 `goft.Model` 
+
+下面返回切片，在 `src/goft/Model.go` 中增加代码
+
+```go
+package goft
+
+type Model interface {
+	String() string
+}
+
+type Models []Model
+```
+
+`type Models []Model` 需要在 `Responder.go` 中进行处理，用户切片转换为 `Models` 需要进行循环和遍历。
+
+使用 `type Models string` 可以比较简单的处理用户切片和 `Models` 之间的转换。
+
+```go
+package goft
+
+import (
+	"encoding/json"
+	"log"
+)
+
+type Model interface {
+	String() string
+}
+
+type Models string
+
+// MakeModels
+func MakeModels(v interface{}) Models {
+	b, err := json.Marshal(v)
+	if err != nil {
+		log.Println(err)
+	}
+	return Models(b)
+}
+```
+
+在用户控制器中，返回的就是 `goft.Models`
+
+```go
+// UserList 用户列表 返回切片
+func (this *UserClass) UserList(c *gin.Context) goft.Models {
+	users := []*models.UserModel{
+		&models.UserModel{UserID: 101, UserName: "custer"},
+		{UserID: 102, UserName: "张三"},
+		{UserID: 103, UserName: "李四"},
+	}
+	return goft.MakeModels(users)
+}
+...
+func (this *UserClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/test", this.UserTest).
+		Handle("GET", "/user", this.UserList).
+		Handle("GET", "/user/detail", this.UserDetail)
+}
+```
+
+在控制器返回接口中新增返回实体类的切片并注册
+
+```go
+...
+func init() {
+	ResponderList = []Responder{
+		new(StringResponder),
+		new(ModelResponder),
+		new(ModelsResponder),
+	} // 反射不能直接使用类型，提供反射需要的指针
+}
+...
+// ModelsResponder 控制器返回实体类切片
+type ModelsResponder func(*gin.Context) Models
+
+// RespondTo 接口的实现
+func (this ModelsResponder) RespondTo() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.Writer.Header().Set("Content-type", "application/json")
+		context.Writer.WriteString(string(this(context)))
+	}
+}
+```
+
+浏览器访问 http://localhost:8080/v1/user ，可以看到 
+
+```json
+[
+    {
+        "UserID": 101,
+        "UserName": "custer"
+    },
+    {
+        "UserID": 102,
+        "UserName": "张三"
+    },
+    {
+        "UserID": 103,
+        "UserName": "李四"
+    }
+]
+```
+
+代码变动 [git commit]()

@@ -12,6 +12,7 @@ func init() {
 	ResponderList = []Responder{
 		new(StringResponder),
 		new(ModelResponder),
+		new(ModelsResponder),
 	} // 反射不能直接使用类型，提供反射需要的指针
 }
 
@@ -44,11 +45,23 @@ func (this StringResponder) RespondTo() gin.HandlerFunc {
 	}
 }
 
+// ModelResponder 控制器返回实体类
 type ModelResponder func(*gin.Context) Model
 
 // RespondTo 接口的实现
 func (this ModelResponder) RespondTo() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		context.JSON(200, this(context))
+	}
+}
+
+// ModelsResponder 控制器返回实体类切片
+type ModelsResponder func(*gin.Context) Models
+
+// RespondTo 接口的实现
+func (this ModelsResponder) RespondTo() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.Writer.Header().Set("Content-type", "application/json")
+		context.Writer.WriteString(string(this(context)))
 	}
 }
