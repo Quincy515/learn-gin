@@ -10,7 +10,9 @@ type Goft struct {
 
 // Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
 func Ignite() *Goft {
-	return &Goft{Engine: gin.New()}
+	g := &Goft{Engine: gin.New()}
+	g.Use(ErrorHandler()) // 必须强制加载异常处理中间件
+	return g
 }
 
 // Launch 最终启动函数，相当于 r.Run()

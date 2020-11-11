@@ -979,4 +979,122 @@ func (this ModelsResponder) RespondTo() gin.HandlerFunc {
 ]
 ```
 
+代码变动 [git commit](统一处理Error (基本方法))
+
+### 12. 统一处理控制器中的Error (基本方法)
+
+修改用户详情路由 `GET /user/:id`
+
+验证 `id` 在 `src/models/UserModel.go` 中使用 `uri:"id"` ，
+
+即可把路由中的 `/user/:id` 和 `UserID` 绑定。再加上简单的验证，并生成空参数的构造函数
+
+```go
+package models
+
+import "fmt"
+
+type UserModel struct {
+	UserID   int `uri:"id" binding:"required,gt=0"`
+	UserName string
+}
+
+func NewUserModel() *UserModel {
+	return &UserModel{}
+}
+
+func (this *UserModel) String() string {
+	return fmt.Sprintf("user_id: %d, user_name: %s", this.UserID, this.UserName)
+}
+```
+
+再修改控制器 `UserDetail()`
+
+```go
+func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
+	user := models.NewUserModel()
+	err := c.BindUri(user)
+  ...
+}
+```
+
+如果验证出错该如何处理，在 `src/goft` 目录下新增文件 `Error.go` 
+
+```go
+package goft
+
+import "github.com/gin-gonic/gin"
+
+// ErrorHandler 中间件
+func ErrorHandler() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		defer func() {
+			if e := recover(); e != nil {
+				context.AbortWithStatusJSON(400, gin.H{"error": e})
+			}
+		}()
+		context.Next()
+	}
+}
+
+// Error 出错直接 panic 然后在中间件中拦截
+func Error(err error) {
+	if err == nil {
+		return
+	} else {
+		panic(err.Error())
+	}
+}
+```
+
+这样 `UserDetail()` 中代码就变成了
+
+```go
+func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
+	user := models.NewUserModel()
+	err := c.BindUri(user)
+	goft.Error(err) // 如果出错会发生 panic，然后在中间件中处理返回 400
+	return user
+}
+```
+
+修改 `func Error(err error)` 为 `func Error(err error, msg ...string)`，以支持自定义报错信息。
+
+```go
+func Error(err error, msg ...string) {
+	if err == nil {
+		return
+	} else {
+		errMsg := err.Error() // 默认为内部的错误信息
+		if len(msg) > 0 {     // 有自定义的报错信息
+			errMsg = msg[0]
+		}
+		panic(errMsg)
+	}
+}
+```
+
+这样就可以支持自定义报错信息
+
+```go
+func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
+	user := models.NewUserModel()
+	err := c.BindUri(user)
+	goft.Error(err, "ID 参数不合法") // 如果出错会发生 panic，然后在中间件中处理返回 400
+	return user
+}
+```
+
+修改 `goft` 构造函数以使得强制加载异常处理中间件
+
+```go
+func Ignite() *Goft {
+	 g:= &Goft{Engine: gin.New()}
+	 g.Use(ErrorHandler()) // 必须强制加载异常处理中间件
+	 return g
+}
+```
+
+运行代码访问浏览器 http://localhost:8080/v1/user/123abc 可以看到 `{"error":"ID 参数不合法"}`
+
 代码变动 [git commit]()

@@ -31,11 +31,14 @@ func (this *UserClass) UserList(c *gin.Context) goft.Models {
 
 // UserDetail 返回 Model 实体(即所有自定义的 struct)，返回值都是 goft.Model
 func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
-	return &models.UserModel{UserID: 101, UserName: "custer"}
+	user := models.NewUserModel()
+	err := c.BindUri(user)
+	goft.Error(err, "ID 参数不合法") // 如果出错会发生 panic，然后在中间件中处理返回 400
+	return user
 }
 
 func (this *UserClass) Build(goft *goft.Goft) {
 	goft.Handle("GET", "/test", this.UserTest).
-		Handle("GET", "/user", this.UserList).
-		Handle("GET", "/user/detail", this.UserDetail)
+		Handle("GET", "/userlist", this.UserList).
+		Handle("GET", "/user/:id", this.UserDetail)
 }
