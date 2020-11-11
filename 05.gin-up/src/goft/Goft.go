@@ -46,9 +46,9 @@ func (this *Goft) Attach(f Fairing) *Goft {
 	return this
 }
 
-// DB 设定数据库连接对象
-func (this *Goft) DB(dba interface{}) *Goft {
-	this.props = append(this.props, dba)
+// Beans 实现简单的依赖注入
+func (this *Goft) Beans(beans ...interface{}) *Goft {
+	this.props = append(this.props, beans...)
 	return this
 }
 

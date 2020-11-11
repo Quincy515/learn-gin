@@ -1513,5 +1513,154 @@ func (this *Goft) setProp(class IClass) {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/a2edc8e40b246850a4ffd66763f9e033de2f0c4f#diff-9dc2b1b9bae1a7f587f7bc524f1be8a4e736ea93f487ad5451bd110d682b8f70L8)
+
+### 15. 示例：快速切换成XORM、简单依赖注入
+
+```go
+// DB 设定数据库连接对象
+func (this *Goft) DB(dba interface{}) *Goft {
+	this.props = append(this.props, dba)
+	return this
+}
+```
+
+修改为简单的依赖注入
+
+```go
+// Beans 实现简单的依赖注入
+func (this *Goft) Beans(beans ...interface{}) *Goft {
+	this.props = append(this.props, beans...)
+	return this
+}
+```
+
+后面只要在 `main.go` 中执行 `Beans()` ，所有参数都会注入到 `Goft` 中
+
+```go
+func main() {
+	goft.Ignite().
+		DB(goft.NewGormAdapter()). // 设定数据库 orm 对象，初始化数据库
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
+			NewUserClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Launch()
+}
+```
+
+修改为
+
+```go
+func main() {
+	goft.Ignite().
+		Beans(goft.NewGormAdapter()). // 设定数据库 orm 的 Bean，简单的依赖注入
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
+			NewUserClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Launch()
+}
+```
+
+只要控制器写上类型匹配到 `Beans` 就会被赋值，比如现在实现快速切换成 `xorm`
+
+先新建一个 `src/goft/XormAdapter.go` 
+
+```go
+package goft
+
+import (
+	_ "github.com/go-sql-driver/mysql"
+	"log"
+	"xorm.io/xorm"
+)
+
+type XormAdapter struct {
+	*xorm.Engine
+}
+
+func NewXormAdapter() *XormAdapter {
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	engine, err := xorm.NewEngine("mysql", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := engine.Ping(); err == nil {
+		log.Println("通过 xorm 连接数据库成功")
+	}
+	engine.DB().SetMaxIdleConns(5)  // SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
+	engine.DB().SetMaxOpenConns(10) // SetMaxOpenConns 设置打开数据库连接的最大数量。
+	return &XormAdapter{Engine: engine}
+}
+```
+
+然后在控制器 `src/classes/User.go` 中就可以使用
+
+```go
+type UserClass struct {
+	//*goft.GormAdapter
+	*goft.XormAdapter
+}
+...
+func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
+	user := models.NewUserModel()
+	err := c.BindUri(user)
+	goft.Error(err, "ID 参数不合法") // 如果出错会发生 panic，然后在中间件中处理返回 400
+	//this.Table(user.TableName()).
+	//	Where("user_id=?", user.UserID).Find(user)
+	has, err := this.Table(user.TableName()).
+		Where("user_id=?", user.UserID).Get(user)
+	if !has { // 没有记录
+		goft.Error(fmt.Errorf("没有该用户"))
+	}
+	return user
+}
+```
+
+在 `main.go` 中注入
+
+```go
+package main
+
+import (
+	. "gin-up/src/classes"
+	. "gin-up/src/goft"
+	. "gin-up/src/middlewares"
+)
+
+func main() {
+	Ignite().
+		Beans(NewGormAdapter(), NewXormAdapter()). // 设定数据库 orm 的 Bean，简单的依赖注入
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
+			NewUserClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Launch()
+}
+```
+
+注意修改 **当前field对应的字段的名称，可选，如不写，则自动根据field名字和转换规则命名，如与其它关键字冲突，请使用单引号括起来。**
+
+https://www.kancloud.cn/kancloud/xorm-manual-zh-cn/56004
+
+```go
+type UserModel struct {
+	UserID   int `xorm:"'user_id'" gorm:"column:user_id" uri:"id" binding:"required,gt=0"`
+	UserName string
+}
+```
+
+重新运行程序，浏览器访问 http://localhost:8080/v1/user/1 可以看到 
+
+```json
+{
+    "UserID": 1,
+    "UserName": "custer123"
+}
+```
+
 代码变动 [git commit]()
+
+
 

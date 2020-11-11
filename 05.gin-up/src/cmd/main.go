@@ -2,13 +2,13 @@ package main
 
 import (
 	. "gin-up/src/classes"
-	"gin-up/src/goft"
+	. "gin-up/src/goft"
 	. "gin-up/src/middlewares"
 )
 
 func main() {
-	goft.Ignite().
-		DB(goft.NewGormAdapter()). // 设定数据库 orm 对象，初始化数据库
+	Ignite().
+		Beans(NewGormAdapter(), NewXormAdapter()). // 设定数据库 orm 的 Bean，简单的依赖注入
 		Attach(NewUserMid()). // 带声明周期的中间件
 		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
 			NewUserClass()).

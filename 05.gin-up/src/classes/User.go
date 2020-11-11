@@ -9,7 +9,8 @@ import (
 
 // UserClass 
 type UserClass struct {
-	*goft.GormAdapter
+	//*goft.GormAdapter
+	*goft.XormAdapter
 }
 
 // NewUserClass UserClass generate constructor
@@ -37,9 +38,16 @@ func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
 	user := models.NewUserModel()
 	err := c.BindUri(user)
 	goft.Error(err, "ID 参数不合法") // 如果出错会发生 panic，然后在中间件中处理返回 400
-	res := this.Table(user.TableName()).
-		Where("user_id=?", user.UserID).Find(user)
-	fmt.Println(res.Error)
+	//this.Table(user.TableName()).
+	//	Where("user_id=?", user.UserID).Find(user)
+	has, err := this.Table("users").
+		Where("user_id=?", user.UserID).Get(user)
+	if err != nil {
+		goft.Error(err)
+	}
+	if !has { // 没有记录
+		goft.Error(fmt.Errorf("没有该用户"))
+	}
 	return user
 }
 

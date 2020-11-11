@@ -3,7 +3,7 @@ package models
 import "fmt"
 
 type UserModel struct {
-	UserID   int `gorm:"column:user_id" uri:"id" binding:"required,gt=0"`
+	UserID   int `xorm:"'user_id'" gorm:"column:user_id" uri:"id" binding:"required,gt=0"`
 	UserName string
 }
 
