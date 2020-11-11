@@ -761,5 +761,114 @@ func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *
 
 后面需要扩展类型，只要再加入如 `StringResponder` 类型就可以。
 
+代码修改 [git commit](https://github.com/custer-go/learn-gin/commit/35f935e5ee99f528b41f3cd5644afef707d8d534#diff-0f1ee6f707b7869eabce2aa3d3ef09047fda674d2af21af8ca3a953a0a4e70abL20)
+
+### 10. 示例: 让控制器支持直接返回实体类
+
+比如请求用户详情接口，需要返回用户实体，首先在 `src/goft` 下新建 `Model.go` 文件
+
+```go
+package goft
+
+type Model interface {
+	String() string
+}
+```
+
+这样业务方法的实体都需要继承 `Model` ，
+
+新建业务实体的文件夹 `src/modles`，然后新建用户实体文件 `UserModel.go`
+
+```go
+package models
+
+type UserModel struct {
+	UserID   int
+	UserName string
+}
+```
+
+然后继承 `goft/model` 的公共实体 `model` 接口，只需要实现 `String()` 方法就可以
+
+```go
+package models
+
+import "fmt"
+
+type UserModel struct {
+	UserID   int
+	UserName string
+}
+
+func (this *UserModel) String() string {
+	return fmt.Sprintf("user_id: %d, user_name: %s", this.UserID, this.UserName)
+}
+```
+
+这样在 `src/classes/User.go` 中的控制器 `UserDetail` 就可以返回用户实体
+
+```go
+package classes
+
+import (
+	"gin-up/src/goft"
+	"gin-up/src/models"
+	"github.com/gin-gonic/gin"
+)
+
+// UserClass 
+type UserClass struct{}
+
+// NewUserClass UserClass generate constructor
+func NewUserClass() *UserClass {
+	return &UserClass{}
+}
+
+// UserList 控制器方法
+func (this *UserClass) UserList(c *gin.Context) string {
+	return "用户列表"
+}
+
+// UserDetail 返回 Model 实体
+func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
+	return &models.UserModel{UserID: 101, UserName: "custer"}
+}
+
+func (this *UserClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/user", this.UserList).
+  		 Handle("GET", "/user/detail", this.UserDetail)
+}
+```
+
+然后在 `src/goft/Responder.go` 中增加扩展类型
+
+```go
+type ModelResponder func(*gin.Context) Model
+
+// RespondTo 接口的实现
+func (this ModelResponder) RespondTo() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.JSON(200, this(context))
+	}
+}
+```
+
+并注册 
+
+```go
+func init() {
+	ResponderList = []Responder{
+		new(StringResponder),
+		new(ModelResponder),
+	} // 反射不能直接使用类型，提供反射需要的指针
+}
+```
+
+这样浏览器访问 http://localhost:8080/v1/user，可以看到显示 `用户列表`
+
+浏览器访问 http://localhost:8080/v1/user/detail，可以看到显示 
+
+`{"UserID": 101,"UserName": "custer"}`
+
 代码修改 [git commit]()
 

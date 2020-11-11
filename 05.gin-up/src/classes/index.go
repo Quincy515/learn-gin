@@ -15,7 +15,7 @@ func NewIndexClass() *IndexClass {
 func (i *IndexClass) GetIndex() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"result": "index ok",
+			"result": "首页",
 		})
 	}
 }

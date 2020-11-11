@@ -9,7 +9,10 @@ import (
 var ResponderList []Responder
 
 func init() {
-	ResponderList = []Responder{new(StringResponder)} // 反射不能直接使用类型，提供反射需要的指针
+	ResponderList = []Responder{
+		new(StringResponder),
+		new(ModelResponder),
+	} // 反射不能直接使用类型，提供反射需要的指针
 }
 
 // Responder 接口目的是 gin.Handle() 的第三个参数
@@ -38,5 +41,14 @@ type StringResponder func(*gin.Context) string
 func (this StringResponder) RespondTo() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		context.String(200, this(context))
+	}
+}
+
+type ModelResponder func(*gin.Context) Model
+
+// RespondTo 接口的实现
+func (this ModelResponder) RespondTo() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.JSON(200, this(context))
 	}
 }
