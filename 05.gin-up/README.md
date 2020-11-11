@@ -605,4 +605,67 @@ func (this *Goft) Attach(f Fairing) *Goft {
 custer
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/1dddbf9bc9e889c6d44b26b59fe93b19b04cd2c7#diff-9dc2b1b9bae1a7f587f7bc524f1be8a4e736ea93f487ad5451bd110d682b8f70L8)
+
+### 08.控制器改造(1):让goft具备控制器的模式
+
+之前写的控制器方法
+
+```go
+// UserList 控制器方法
+func (this *UserClass) UserList() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"result": "success",
+		})
+	}
+}
+```
+
+每个控制器方法都要返回 `gin.HandlerFunc` ，这样很不方便，我们希望的形式是
+
+`func (this *UserClass) UserList(ctx *gin.Context) string{ return "abc" }`
+
+如果返回的是字符串，那么显示的就是 `string `格式，如果返回的是 `struct` ，那么显示的就是 `JSON` 格式。
+
+进一步规范控制器方法。
+
+如果控制器函数是返回 `string` 的形式，那么修改控制器生成函数
+
+```go
+func (this *UserClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/user", this.UserList) // <- 参数修改为函数
+}
+```
+
+需要修改重载的 `Handle()` 方法
+
+```go
+// Handle 重载 gin.Handle 函数
+func (this *Goft) Handle(httpMethod, relativePath string, handlers ...gin.HandlerFunc) *Goft {
+	this.g.Handle(httpMethod, relativePath, handlers...) // 最后一个参数，需要使用 ...来延展
+	return this
+}
+```
+
+修改为
+
+```go
+func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *Goft {
+	if h, ok := handler.(func(*gin.Context) string); ok { // 断言成功
+		this.g.Handle(httpMethod, relativePath, func(context *gin.Context) {
+			context.String(200, h(context))
+		})
+	}
+	return this
+}
+```
+
+此时访问 http://localhost:8080/v1/user 可以看到页面显示的是字符串 `abc`。
+
 代码变动 [git commit]()
+
+### 09. 封装控制器的返回类型判断
+
+如果需要控制器返回的是对象切片或没有返回值，还需要进一步封装。
+

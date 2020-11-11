@@ -19,8 +19,12 @@ func (this *Goft) Launch() {
 }
 
 // Handle 重载 gin.Handle 函数
-func (this *Goft) Handle(httpMethod, relativePath string, handlers ...gin.HandlerFunc) *Goft {
-	this.g.Handle(httpMethod, relativePath, handlers...) // 最后一个参数，需要使用 ...来延展
+func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *Goft {
+	if h, ok := handler.(func(*gin.Context) string); ok { // 断言成功
+		this.g.Handle(httpMethod, relativePath, func(context *gin.Context) {
+			context.String(200, h(context))
+		})
+	}
 	return this
 }
 
