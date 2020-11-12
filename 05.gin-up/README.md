@@ -1662,5 +1662,103 @@ type UserModel struct {
 
 代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/0459a5d97549c21f2a497a04226cbbe16100ba38#diff-8d9e1f78703b2eb32787b5d6fcdc6da3201ad241fb4c572b6bbe8eb8284031e3L9)
 
+### 16. 集成yaml的配置、加载配置
+
+使用第三方 yaml 解析库 https://github.com/go-yaml/yaml
+
+`go get gopkg.in/yaml.v2` 
+
+首先在项目根目录下创建新的配置文件 `application.yaml`
+
+```yaml
+server:
+  port: 8088
+```
+
+在项目启动时之前是写死的端口
+
+```go
+// Launch 最终启动函数，相当于 r.Run()
+func (this *Goft) Launch() {
+	this.Run(":8080")
+}
+```
+
+所以这里需要使用配置来完成加载，现在目录 `src/goft` 目录下新建文件 `SysConfig.go`，表示系统配置
+
+```go
+package goft
+
+import (
+	"gopkg.in/yaml.v2"
+	"log"
+)
+
+type ServerConfig struct {
+	Port int32
+	Name string
+}
+
+// SysConfig 系统配置
+type SysConfig struct {
+	Server *ServerConfig
+}
+
+// NewSysConfig 初始化默认配置
+func NewSysConfig() *SysConfig {
+	return &SysConfig{Server: &ServerConfig{Port: 8080, Name: "goft"}}
+}
+
+func InitConfig() *SysConfig {
+	config := NewSysConfig()             // 如果没有设定配置文件，使用默认配置
+	if b := LoadConfigFile(); b != nil { // 如果设定了配置文件
+		err := yaml.Unmarshal(b, config) // 把字符串类型的配置文件映射到 struct
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	return config
+}
+```
+
+新建 `src/goft/WebUtil.go` 文件
+
+```go
+package goft
+
+import (
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+// 读取当前执行的文件夹目录
+// LoadConfigFile 读取配置文件
+func LoadConfigFile() []byte {
+	dir, _ := os.Getwd()
+	file := dir + "/application.yaml"
+	b, err := ioutil.ReadFile(file)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return b
+}
+```
+
+修改启动端口配置
+
+```go
+// Launch 最终启动函数，相当于 r.Run()
+func (this *Goft) Launch() {
+	config := InitConfig()
+	this.Run(fmt.Sprintf(":%d", config.Server.Port))
+}
+```
+
+这样启动端口就变成了 `:8088`，思考自定义 `config` 怎么通过依赖注入的方式，在控制器里使用。
+
+代码变动 [git commit]()
+
 
 

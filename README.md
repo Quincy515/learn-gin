@@ -18,8 +18,8 @@ Go 课程
 | 10. Go Web场景实战(第一篇)：极致性能篇 | http://www.jtthink.com/course/100  |                                                              |
 | 11. Go Web+ElasticSearch7实战基础篇 ⭐️  | http://www.jtthink.com/course/104  |                                                              |
 | 12. Go Web+RabbitMQ实战速学篇 ⭐️        | http://www.jtthink.com/course/110  |                                                              |
-| 13. Go基础进阶之MySQL代理和中间件篇    | http://www.jtthink.com/course/85   |                                                              |
-| 14. Go Etcd实战速学                    | http://www.jtthink.com/course/90   |                                                              |
+| 13. Go基础进阶之MySQL代理和中间件篇 ⭐️  | http://www.jtthink.com/course/85   |                                                              |
+| 14. Go Etcd实战速学 ⭐️                  | http://www.jtthink.com/course/90   |                                                              |
 | 15. Go Grpc实战速学入门 ⭐️              | http://www.jtthink.com/course/91   |                                                              |
 | 16. Go-Kit微服务入门第一季             | http://www.jtthink.com/course/83   |                                                              |
 | 17. Go-Micro微服务实战入门(第一波)     | http://www.jtthink.com/course/96   |                                                              |
@@ -29,9 +29,9 @@ Go 课程
 | 21. Go高并发模型之管道模式 ⭐️           | http://www.jtthink.com/course/119  |                                                              |
 | 22. Go IoC容器初级版 ⭐️                 | https://www.jtthink.com/course/128 |                                                              |
 | 23. Go Redis 脚手架 ⭐️                  | https://www.jtthink.com/course/130 |                                                              |
-| 24. Go Casbin 权限实战速学 ⭐️           | https://www.jtthink.com/course/130 | [100%](https://github.com/custer-go/learn-gin/tree/main/03.gin-casbin) |
+| 24. Go Casbin 权限实战速学 ⭐️           | https://www.jtthink.com/course/132 | [100%](https://github.com/custer-go/learn-gin/tree/main/03.gin-casbin) |
 | 25. Go oAuth2实战速学 ⭐️                | https://www.jtthink.com/course/135 | [100%](https://github.com/custer-go/learn-gin/tree/main/04.gin-oauth2) |
-| 26. Go web分布式存储实战 ⭐️             | http://www.jtthink.com/course/124  |                                                              |
+| 26. Go web分布式存储实战 ⭐️⭐️            | http://www.jtthink.com/course/124  |                                                              |
 | 27. Go压测实战(初级篇)                 | http://www.jtthink.com/course/126  |                                                              |
 | 28. Go Colly简易爬虫                   | http://www.jtthink.com/course/99   |                                                              |
 | 29. Go Api网关之traefik入门            | https://www.jtthink.com/course/92  |                                                              |
@@ -59,7 +59,7 @@ Go 课程
 | 4. k8s基础速学篇1(基于rancher)    ⭐️                          | https://www.jtthink.com/course/131 |      |
 | 5. k8s基础速学篇2(基于kubeadm) ⭐️                             | https://www.jtthink.com/course/137 |      |
 | 6. Go+k8s api速学基础篇                 ⭐️                    | https://www.jtthink.com/course/136 |      |
-|                                                              |                                    |      |
+| 7. k8s+OpenFaaS快速入门              ⭐️                       | https://www.jtthink.com/course/133 |      |
 |                                                              |                                    |      |
 |                                                              |                                    |      |
 

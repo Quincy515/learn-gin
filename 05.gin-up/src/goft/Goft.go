@@ -1,6 +1,7 @@
 package goft
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"reflect"
 )
@@ -22,7 +23,8 @@ func Ignite() *Goft {
 
 // Launch 最终启动函数，相当于 r.Run()
 func (this *Goft) Launch() {
-	this.Run(":8080")
+	config := InitConfig()
+	this.Run(fmt.Sprintf(":%d", config.Server.Port))
 }
 
 // Handle 重载 gin.Handle 函数
