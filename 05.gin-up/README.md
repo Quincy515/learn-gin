@@ -1896,9 +1896,318 @@ func (this *Goft) setProp(class IClass) {
 
 运行代码访问浏览器 http://localhost:8088/v1/test 测试可以看到写死的返回值 `21 `， `用户测试21`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/a40c67db303bb4e1f9ef1c969050a8d19c555149#diff-67df7db1d8da06247e01cd28608b4341f6e5d891580d62534787e2abfb849de4L1)
+
+### 18. Value注解 (下)、修改整体结构
+
+之前在 `Goft` 里的属性设置，从一开始是的 `dab interface{}` 到 `props []interface{}` 
+
+```go
+// Goft
+type Goft struct {
+	*gin.Engine                  // 把 *gin.Engine 放入主类里
+	g           *gin.RouterGroup // 保存 group 对象
+	props       []interface{}
+	//dba         interface{}      // 保存和执行 *gorm.DB 对象
+}
+```
+
+现在修改为
+
+```go
+type Goft struct {
+	*gin.Engine                  // 把 *gin.Engine 放入主类里
+	g           *gin.RouterGroup // 保存 group 对象
+	beanFactory *BeanFactory
+}
+```
+
+新增了文件 `src/goft/BeanFactory.go` ，
+
+```go
+package goft
+
+import "reflect"
+
+type BeanFactory struct {
+	beans []interface{}
+}
+
+func NewBeanFactory() *BeanFactory {
+	bf := &BeanFactory{beans: make([]interface{}, 0)}
+	bf.beans = append(bf.beans, bf)
+	return bf
+}
+
+// setBean 实现简单的依赖注入，往内存中塞入 bean
+func (this *BeanFactory) setBean(beans ...interface{}) {
+	this.beans = append(this.beans, beans...)
+}
+
+// GetBean 外部使用获取注入的属性
+func (this *BeanFactory) GetBean(bean interface{}) interface{} {
+	return this.getBean(reflect.TypeOf(bean))
+}
+
+// getBean 获取内存中预先设置好的 bean 对象
+func (this *BeanFactory) getBean(t reflect.Type) interface{} {
+	for _, p := range this.beans {
+		if t == reflect.TypeOf(p) {
+			return p
+		}
+	}
+	return nil
+}
+
+// Inject 给外部用的 （后面还要改,这个方法不处理注解)
+func (this *BeanFactory) Inject(object interface{}) {
+	vObject := reflect.ValueOf(object)
+	if vObject.Kind() == reflect.Ptr { //由于不是控制器 ，所以传过来的值 不一定是指针。因此要做判断
+		vObject = vObject.Elem()
+	}
+	for i := 0; i < vObject.NumField(); i++ {
+		f := vObject.Field(i)
+		if f.Kind() != reflect.Ptr || !f.IsNil() {
+			continue
+		}
+		if p := this.getBean(f.Type()); p != nil && f.CanInterface() {
+			f.Set(reflect.New(f.Type().Elem()))
+			f.Elem().Set(reflect.ValueOf(p).Elem())
+		}
+	}
+}
+
+// inject 把bean注入到控制器中 (内部方法,用户控制器注入。并同时处理注解)
+func (this *BeanFactory) inject(class IClass) {
+	vClass := reflect.ValueOf(class).Elem()
+	vClassT := reflect.TypeOf(class).Elem()
+	for i := 0; i < vClass.NumField(); i++ {
+		f := vClass.Field(i)
+		if f.Kind() != reflect.Ptr || !f.IsNil() {
+			continue
+		}
+		if IsAnnotation(f.Type()) {
+			f.Set(reflect.New(f.Type().Elem()))
+			f.Interface().(Annotation).SetTag(vClassT.Field(i).Tag)
+			this.Inject(f.Interface())
+			continue
+		}
+		if p := this.getBean(f.Type()); p != nil {
+			f.Set(reflect.New(f.Type().Elem()))
+			f.Elem().Set(reflect.ValueOf(p).Elem())
+		}
+	}
+}
+```
+
+修改 `src/goft/Goft.go` 文件
+
+```go
+package goft
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+)
+
+// Goft
+type Goft struct {
+	*gin.Engine                  // 把 *gin.Engine 放入主类里
+	g           *gin.RouterGroup // 保存 group 对象
+	beanFactory *BeanFactory
+}
+
+// Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
+func Ignite() *Goft {
+	g := &Goft{Engine: gin.New(), beanFactory: NewBeanFactory()}
+	g.Use(ErrorHandler())               // 必须强制加载异常处理中间件
+	g.beanFactory.setBean(InitConfig()) // 配置文件加载进 bean 中
+	return g
+}
+
+// Launch 最终启动函数，相当于 r.Run()
+func (this *Goft) Launch() {
+	var port int32 = 8080
+	if config := this.beanFactory.GetBean(new(SysConfig)); config != nil {
+		port = config.(*SysConfig).Server.Port
+	}
+	this.Run(fmt.Sprintf(":%d", port))
+}
+
+// Handle 重载 gin.Handle 函数
+func (this *Goft) Handle(httpMethod, relativePath string, handler interface{}) *Goft {
+	if h := Convert(handler); h != nil {
+		this.g.Handle(httpMethod, relativePath, h)
+	}
+	return this
+}
+
+// Attach 实现中间件的加入
+func (this *Goft) Attach(f Fairing) *Goft {
+	this.Use(func(c *gin.Context) {
+		err := f.OnRequest(c)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.Next() // 继续往下执行
+		}
+	})
+	return this
+}
+
+// Beans S和定数据库连接对象
+func (this *Goft) Beans(beans ...interface{}) *Goft {
+	this.beanFactory.setBean(beans...)
+	return this
+}
+
+// Mount 挂载控制器，定义接口，控制器继承接口就可以传进来
+func (this *Goft) Mount(group string, classes ...IClass) *Goft {
+	this.g = this.Group(group)
+	for _, class := range classes {
+		class.Build(this)
+		this.beanFactory.inject(class)
+	}
+	return this
+}
+```
+
+修改注解文件 `src/goft/Annotation.go`
+
+```go
+package goft
+
+import (
+	"fmt"
+	"reflect"
+	"strings"
+)
+
+// Annotation 注解接口
+type Annotation interface {
+	SetTag(tag reflect.StructTag) // 通过 Tag 完成更多复杂功能
+	String() string
+}
+
+// AnnotationList 注解列表是注解接口的切片
+var AnnotationList []Annotation
+
+//IsAnnotation 判断当前注入对象是否是注解，运行在系统启动之前运行，不用考虑性能
+func IsAnnotation(t reflect.Type) bool {
+	for _, item := range AnnotationList {
+		if reflect.TypeOf(item) == t {
+			return true
+		}
+	}
+	return false
+}
+
+// init 包构造函数
+func init() {
+	AnnotationList = make([]Annotation, 0)
+	AnnotationList = append(AnnotationList, new(Value))
+}
+
+// Value 注解
+type Value struct {
+	tag         reflect.StructTag
+	BeanFactory *BeanFactory
+}
+
+func (this *Value) SetTag(tag reflect.StructTag) {
+	this.tag = tag
+}
+
+func (this *Value) String() string {
+	get_prefix := this.tag.Get("prefix")
+	if get_prefix == "" {
+		return ""
+	}
+	prefix := strings.Split(get_prefix, ".")
+	if config := this.BeanFactory.GetBean(new(SysConfig)); config != nil {
+		get_value := GetConfigValue(config.(*SysConfig).Config, prefix, 0)
+		if get_value != nil {
+			return fmt.Sprintf("%v", get_value)
+		} else {
+			return ""
+		}
+	} else {
+		return ""
+	}
+}
+```
+
+在 `src/goft/Sysconfig.go` 中增加读取用户配置文件函数
+
+```go
+package goft
+
+import (
+	"gopkg.in/yaml.v2"
+	"log"
+)
+
+type UserConfig map[interface{}]interface{}
+
+// 递归读取用户配置文件
+func GetConfigValue(m UserConfig, prefix []string, index int) interface{} {
+	key := prefix[index]
+	if v, ok := m[key]; ok {
+		if index == len(prefix)-1 {
+			return v
+		} else {
+			index = index + 1
+			if mv, ok := v.(UserConfig); ok {
+				return GetConfigValue(mv, prefix, index)
+			} else {
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
+type ServerConfig struct {
+	Port int32
+	Name string
+}
+
+// SysConfig 系统配置
+type SysConfig struct {
+	Server *ServerConfig
+	Config UserConfig
+}
+
+// NewSysConfig 初始化默认配置
+func NewSysConfig() *SysConfig {
+	return &SysConfig{Server: &ServerConfig{Port: 8080, Name: "goft"}}
+}
+
+func InitConfig() *SysConfig {
+	config := NewSysConfig()             // 如果没有设定配置文件，使用默认配置
+	if b := LoadConfigFile(); b != nil { // 如果设定了配置文件
+		err := yaml.Unmarshal(b, config) // 把字符串类型的配置文件映射到 struct
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	return config
+}
+```
+
+<img src="../imgs/20_goft.jpg" style="zoom:95%;" />
+
+用户在上层写一个控制器，在控制器里可以根据已经设定好的内容，来进行注入，
+
+规定注入的内容必须是指针对象 `*goft.XormAdapter` ，判断这个属性是否是指针对象，
+
+如果是才做处理，如果这个属性被初始化了，也不做处理。
+
+`Age *goft.Value prefix:"user.age"`  这是注解 `Bean` 对象，
+
+普通的 `Bean` 对象和注解 `Bean` 对象，区分处理。
+
 代码变动 [git commit]()
-
-
 
 
 

@@ -1,10 +1,15 @@
 package goft
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+	"strings"
+)
 
 // Annotation 注解接口
 type Annotation interface {
 	SetTag(tag reflect.StructTag) // 通过 Tag 完成更多复杂功能
+	String() string
 }
 
 // AnnotationList 注解列表是注解接口的切片
@@ -28,7 +33,8 @@ func init() {
 
 // Value 注解
 type Value struct {
-	tag reflect.StructTag
+	tag         reflect.StructTag
+	BeanFactory *BeanFactory
 }
 
 func (this *Value) SetTag(tag reflect.StructTag) {
@@ -36,5 +42,19 @@ func (this *Value) SetTag(tag reflect.StructTag) {
 }
 
 func (this *Value) String() string {
-	return "21"
+	get_prefix := this.tag.Get("prefix")
+	if get_prefix == "" {
+		return ""
+	}
+	prefix := strings.Split(get_prefix, ".")
+	if config := this.BeanFactory.GetBean(new(SysConfig)); config != nil {
+		get_value := GetConfigValue(config.(*SysConfig).Config, prefix, 0)
+		if get_value != nil {
+			return fmt.Sprintf("%v", get_value)
+		} else {
+			return ""
+		}
+	} else {
+		return ""
+	}
 }
