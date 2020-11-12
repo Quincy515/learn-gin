@@ -5,6 +5,8 @@ import (
 	"log"
 )
 
+type UserConfig map[string]interface{}
+
 type ServerConfig struct {
 	Port int32
 	Name string
@@ -13,6 +15,7 @@ type ServerConfig struct {
 // SysConfig 系统配置
 type SysConfig struct {
 	Server *ServerConfig
+	Config UserConfig
 }
 
 // NewSysConfig 初始化默认配置

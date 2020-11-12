@@ -1,2 +1,6 @@
 server:
   port: 8088
+config:
+  user:
+    score: 100
+    age: 19

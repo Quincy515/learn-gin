@@ -1758,7 +1758,147 @@ func (this *Goft) Launch() {
 
 这样启动端口就变成了 `:8088`，思考自定义 `config` 怎么通过依赖注入的方式，在控制器里使用。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/5026ea07296b49447de2be4d43d7904e1b23b9ed#diff-67df7db1d8da06247e01cd28608b4341f6e5d891580d62534787e2abfb849de4R1)
+
+### 17. 实现Value注解读取配置(上)
+
+自定义的 `config`，在 `yaml` 文件中必须用 `config` 开头，然后是用户定义的
+
+比如：
+
+```yaml
+server:
+  port: 8088
+config:
+  user:
+    score: 100
+```
+
+修改 `SysConfig` 
+
+```go
+// SysConfig 系统配置
+type SysConfig struct {
+	Server *ServerConfig
+	Config map[string]interface{}
+}
+```
+
+运行打印输出 `fmt.Println(InitConfig().Config)` 可以看到 `map[user:map[score:100]]`
+
+为了以后的扩展，优化代码
+
+```go
+type UserConfig map[string]interface{}
+
+// SysConfig 系统配置
+type SysConfig struct {
+	Server *ServerConfig
+	Config UserConfig
+}
+```
+
+之前写的依赖注入，只要类型相同，就可以把这个值注入进来。
+
+**Value 注解** 比如在 `yaml` 中加 `age: 19` ，然后在控制器中读取 `age`
+
+```go
+type UserClass struct {
+	//*goft.GormAdapter
+	*goft.XormAdapter
+	Age *goft.Value `prefix:"user.age"`
+}
+...
+// UserTest 控制器方法
+func (this *UserClass) UserTest(c *gin.Context) string {
+	return "用户测试" + this.Age.String()
+}
+```
+
+`prefix:"user.age"` 代表读取 `config` 下 `user` 的 `age` 。
+
+Go 中不支持注解，接下来通过依赖注入完成 **注解** ，新建文件 `src/goft/Annotation.go` 文件
+
+```go
+package goft
+
+import "reflect"
+
+// Annotation 注解接口
+type Annotation interface {
+	SetTag(tag reflect.StructTag) // 通过 Tag 完成更多复杂功能
+}
+
+// AnnotationList 注解列表是注解接口的切片
+var AnnotationList []Annotation
+
+//IsAnnotation 判断当前注入对象是否是注解，运行在系统启动之前运行，不用考虑性能
+func IsAnnotation(t reflect.Type) bool {
+	for _, item := range AnnotationList {
+		if reflect.TypeOf(item) == t {
+			return true
+		}
+	}
+	return false
+}
+
+// init 包构造函数
+func init() {
+	AnnotationList = make([]Annotation, 0)
+	AnnotationList = append(AnnotationList, new(Value))
+}
+
+// Value 注解
+type Value struct {
+	tag reflect.StructTag
+}
+
+func (this *Value) SetTag(tag reflect.StructTag) {
+	this.tag = tag
+}
+
+func (this *Value) String() string {
+	return "21"
+}
+```
+
+然后修改依赖注入处理的方法 `Mount`
+
+```go
+// setProp 赋值
+func (this *Goft) setProp(class IClass) {
+	// reflect.ValueOf(class) 是指针，reflect.ValueOf(class) 是指针指向的对象
+	vClass := reflect.ValueOf(class).Elem()  // 反射
+	vClassT := reflect.TypeOf(class).Elem()
+	for i := 0; i < vClass.NumField(); i++ { // 遍历 vClass 的属性
+		f := vClass.Field(i)                       // 判断属性是否已经初始化
+		if !f.IsNil() || f.Kind() != reflect.Ptr { // 如果控制器已经初始化或者不是指针
+			continue // 就跳过
+		}
+		if p := this.getProp(f.Type()); p != nil {
+			// vClass.Field(0)是强制使用第一个属性的指针，使用 Set() 进行赋值完成初始化
+			// vClass.Field(0).Type() --> 指针 *GormAdapter
+			// vClass.Field(0).Type().Elem() -->指针指向的对象 GormAdapter
+			// reflect.New(vClass.Field(0).Type().Elem()) --> new 指针 *GormAdapter
+			// vClass.Field(0).Set(reflect.New(vClass.Field(0).Type().Elem()))
+			// Elem() 是指针指向的对象 Set() 是进行赋值
+			// vClass.Field(0).Elem().Set(reflect.ValueOf(this.dba).Elem())
+			f.Set(reflect.New(f.Type().Elem()))     // 初始化
+			f.Elem().Set(reflect.ValueOf(p).Elem()) // 赋值
+
+			if IsAnnotation(f.Type()) { // 判断是否是注解
+				p.(Annotation).SetTag(vClassT.Field(i).Tag)
+			}
+		}
+	}
+}
+```
+
+运行代码访问浏览器 http://localhost:8088/v1/test 测试可以看到写死的返回值 `21 `， `用户测试21`
+
 代码变动 [git commit]()
+
+
 
 
 

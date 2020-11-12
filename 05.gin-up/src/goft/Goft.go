@@ -78,6 +78,7 @@ func (this *Goft) getProp(t reflect.Type) interface{} {
 func (this *Goft) setProp(class IClass) {
 	// reflect.ValueOf(class) 是指针，reflect.ValueOf(class) 是指针指向的对象
 	vClass := reflect.ValueOf(class).Elem()  // 反射
+	vClassT := reflect.TypeOf(class).Elem()
 	for i := 0; i < vClass.NumField(); i++ { // 遍历 vClass 的属性
 		f := vClass.Field(i)                       // 判断属性是否已经初始化
 		if !f.IsNil() || f.Kind() != reflect.Ptr { // 如果控制器已经初始化或者不是指针
@@ -93,6 +94,10 @@ func (this *Goft) setProp(class IClass) {
 			// vClass.Field(0).Elem().Set(reflect.ValueOf(this.dba).Elem())
 			f.Set(reflect.New(f.Type().Elem()))     // 初始化
 			f.Elem().Set(reflect.ValueOf(p).Elem()) // 赋值
+
+			if IsAnnotation(f.Type()) { // 判断是否是注解
+				p.(Annotation).SetTag(vClassT.Field(i).Tag)
+			}
 		}
 	}
 }

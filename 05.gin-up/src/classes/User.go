@@ -11,6 +11,7 @@ import (
 type UserClass struct {
 	//*goft.GormAdapter
 	*goft.XormAdapter
+	Age *goft.Value `prefix:"user.age"`
 }
 
 // NewUserClass UserClass generate constructor
@@ -20,7 +21,7 @@ func NewUserClass() *UserClass {
 
 // UserTest 控制器方法
 func (this *UserClass) UserTest(c *gin.Context) string {
-	return "用户测试"
+	return "用户测试" + this.Age.String()
 }
 
 // UserList 用户列表 返回切片
