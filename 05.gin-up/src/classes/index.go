@@ -13,6 +13,7 @@ func NewIndexClass() *IndexClass {
 
 // GetIndex 业务方法，函数名根据业务而起
 func (i *IndexClass) GetIndex(ctx *gin.Context) goft.View {
+	ctx.Set("name", "custer")
 	return "index"
 }
 

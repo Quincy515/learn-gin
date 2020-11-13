@@ -76,6 +76,6 @@ type ViewResponder func(*gin.Context) View
 // RespondTo 接口的实现
 func (this ViewResponder) RespondTo() gin.HandlerFunc {
 	return func(context *gin.Context) {
-		context.HTML(200, string(this(context))+".html", nil)
+		context.HTML(200, string(this(context))+".html", context.Keys)
 	}
 }

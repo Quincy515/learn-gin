@@ -7,6 +7,8 @@ import (
 )
 
 func main() {
+	//GenTplFunc("src/funcs") // 在该参数目录下自动生成 funcmap.go 文件
+	//return
 	Ignite().
 		Beans(NewGormAdapter(), NewXormAdapter()). // 设定数据库 orm 的 Bean，简单的依赖注入
 		Attach(NewUserMid()). // 带声明周期的中间件

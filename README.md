@@ -24,7 +24,7 @@ Go 课程
 | 16. Go-Kit微服务入门第一季             | http://www.jtthink.com/course/83   |                                                              |
 | 17. Go-Micro微服务实战入门(第一波)     | http://www.jtthink.com/course/96   |                                                              |
 | 18. Go Git 创建自己的 git 服务         | http://www.jtthink.com/course/102  |                                                              |
-| 19. Go Gin模块化改造和工具开发         | http://www.jtthink.com/course/105  |                                                              |
+| 19. Go Gin模块化改造和工具开发 ⭐️       | http://www.jtthink.com/course/105  |                                                              |
 | 20. Go-Micro微服务实战视频教育网站 ⭐️⭐️  | http://www.jtthink.com/course/116  |                                                              |
 | 21. Go高并发模型之管道模式 ⭐️           | http://www.jtthink.com/course/119  |                                                              |
 | 22. Go IoC容器初级版 ⭐️                 | https://www.jtthink.com/course/128 |                                                              |

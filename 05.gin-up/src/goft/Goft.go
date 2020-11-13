@@ -2,6 +2,7 @@ package goft
 
 import (
 	"fmt"
+	"gin-up/src/funcs"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,10 +16,11 @@ type Goft struct {
 // Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
 func Ignite() *Goft {
 	g := &Goft{Engine: gin.New(), beanFactory: NewBeanFactory()}
-	g.Use(ErrorHandler())               // 必须强制加载异常处理中间件
+	g.Use(ErrorHandler()) // 必须强制加载异常处理中间件
 	config := InitConfig()
 	g.beanFactory.setBean(config) // 配置文件加载进 bean 中
 	if config.Server.Html != "" {
+		g.FuncMap = funcs.FuncMap
 		g.LoadHTMLGlob(config.Server.Html)
 	}
 	return g
