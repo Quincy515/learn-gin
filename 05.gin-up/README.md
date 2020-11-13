@@ -2784,6 +2784,120 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/b68874dcce1808db2cf55eb0da3131f706f8658f#diff-2fb98cca777cba1a79ccacaf10dd23fba7dd59a7c8ac74ddd522908acd65b26aR1)
+
+### 22. 设计简单协程任务组件：基本结构
+
+在脚手架里扩展一些功能，增加协程任务，使用协程任务做一些异步调用。
+
+上一步只是取出新闻，实际过程中需要访问量+1，记录访问日志等。
+
+用户读取新闻，应该把数据直接返回给用户，其他访问量+1，记录访问日志等需要等待的操作应该使用任务。
+
+任务就是取出新闻后，还需要做的几个步骤。
+
+协程应该统一管理，在 `src/goft` 目录下创建新的文件 `Task.go`，做一些基本的限定
+
+```go
+type TaskFunc func(params ...interface{})
+
+func Task(f TaskFunc, params ...interface{}) {
+
+}
+```
+
+在控制器中使用 `Task` 执行协程任务
+
+```go
+// ArticleDetail 路由到这个方法里面
+func (this *ArticleClass) ArticleDetail(ctx *gin.Context) goft.Model {
+	news := models.NewArticleModel()
+	goft.Error(ctx.ShouldBindUri(news))
+	res := this.Table(news.TableName()).Where("id=?", news.NewsId).Find(news)
+	if res.Error != nil || res.RowsAffected == 0 {
+		goft.Error(errors.New("没有找到记录"))
+	}
+
+	goft.Task(this.UpdateView, news.NewsId) // 代表执行一个协程任务
+	return news
+}
+
+// UpdateView 增加点击量
+func (this *ArticleClass) UpdateView(params ...interface{}) {
+	this.Table("mynews").Where("id=?", params[0]).
+		Update("views", gorm.Expr("views+1"))
+}
+```
+
+完善协程任务代码
+
+```go
+package goft
+
+import "sync"
+
+// TaskFunc 任务执行的函数
+type TaskFunc func(params ...interface{})
+
+// taskList 没有初始化的任务列表
+var taskList chan *TaskExecutor
+
+// init 引用包时执行
+func init() {
+	chlist := getTaskList() // 得到任务列表
+	go func() {
+		for t := range chlist {
+			t.Exec() // 执行任务
+		}
+	}()
+}
+
+var once sync.Once
+
+// getTaskList
+func getTaskList() chan *TaskExecutor {
+	once.Do(func() { // 单例模式
+		// 对 taskList 进行初始化 chan
+		taskList = make(chan *TaskExecutor)
+	})
+	return taskList
+}
+
+// TaskExecutor 任务执行者
+type TaskExecutor struct {
+	f TaskFunc      // 任务中需要执行的函数
+	p []interface{} // 任务重需要执行函数的参数
+}
+
+func NewTaskExecutor(f TaskFunc, p []interface{}) *TaskExecutor {
+	return &TaskExecutor{f: f, p: p}
+}
+
+// Exec 执行任务
+func (this *TaskExecutor) Exec() {
+	this.f(this.p...)
+}
+
+// Task 对外的方法，当有任务时，把任务塞入任务列表管道
+func Task(f TaskFunc, params ...interface{}) {
+	getTaskList() <- NewTaskExecutor(f, params) // 增加任务队列
+}
+```
+
+执行程序访问 http://localhost:8088/v1/article/6 每次访问后 `views` 会加1，
+
+```json
+{
+  "id": 6,
+  "title": "标题6",
+  "content": "内容6",
+  "views": 64,
+  "Addtime": "2020-11-14T00:27:27+08:00"
+}
+```
+
+显示 `"views": 64,` 时，数据库存储的是 `65` ，因为先取出数据再进行任务执行的。
+
 代码变动 [git commit]()
 
 
