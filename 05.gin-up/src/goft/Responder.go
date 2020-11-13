@@ -13,6 +13,7 @@ func init() {
 		new(StringResponder),
 		new(ModelResponder),
 		new(ModelsResponder),
+		new(ViewResponder),
 	} // 反射不能直接使用类型，提供反射需要的指针
 }
 
@@ -63,5 +64,18 @@ func (this ModelsResponder) RespondTo() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		context.Writer.Header().Set("Content-type", "application/json")
 		context.Writer.WriteString(string(this(context)))
+	}
+}
+
+// View
+type View string
+
+// ViewResponder 返回 html 模板
+type ViewResponder func(*gin.Context) View
+
+// RespondTo 接口的实现
+func (this ViewResponder) RespondTo() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.HTML(200, string(this(context))+".html", nil)
 	}
 }

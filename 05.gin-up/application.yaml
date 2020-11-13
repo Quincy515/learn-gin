@@ -1,5 +1,6 @@
 server:
   port: 8088
+  html: views/*
 config:
   user:
     score: 100

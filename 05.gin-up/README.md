@@ -2207,7 +2207,145 @@ func InitConfig() *SysConfig {
 
 普通的 `Bean` 对象和注解 `Bean` 对象，区分处理。
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/6e27208a5ff95308801680a8cb4be375b203d3e0#diff-5da66211ac8e72a52d87cad644addef96019578aa36b3b0cc0b10e2f22ddea2aL1)
+
+### 19. 模板渲染(1):在gin脚手架中渲染html
+
+```shell
+-----------------------| 控制器 
+---------------------------↓
+--------------------------Goft
+------------BeanFactory  Fairing  Annotation
+-----------（依赖注入）    （中间件）  （注解）
+--------------------    Responder
+---------------------------↓
+----------------------  Gin 框架
+```
+
+使用 `Responder` 来扩展 `html` 渲染。
+
+在控制器中之前是返回 `string` 或 `goft.Model` 或 `goft.Models`，
+
+在 `src/goft/Responder.go` 中扩展返回的类型 `type View string` 。
+
+在 `src/classes/Index.go` 控制器中可以使用
+
+```go
+func (i *IndexClass) GetIndex(ctx *gin.Context) goft.View {
+	return "index"
+}
+```
+
+在根目录下新建文件 `views` 来存放 `html` 文件，新建 `index.html`
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    首页
+</body>
+</html>
+```
+
+怎么在控制器中解析 `html`，在 `src/goft/Responder.go` 中修改代码
+
+```go
+type View string
+
+// ViewResponder 把返回字符串的 gin.HandlerFunc 包装成一个类型
+type ViewResponder func(*gin.Context) View
+
+// RespondTo 接口的实现
+func (this ViewResponder) RespondTo() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.HTML(200, string(this(context))+".html", nil)
+	}
+}
+```
+
+在配置文件 `application.yaml` 中配置 `html` 文件夹路径
+
+```yaml
+server:
+  port: 8088
+  html: views/*
+config:
+  user:
+    score: 100
+    age: 19
+```
+
+在 `src/goft/SysConfig.go` 中添加读取配置文件的属性 
+
+```go
+type ServerConfig struct {
+	Port int32
+	Name string
+	Html string 
+}
+```
+
+在 `src/goft/Goft` 中之前把配置塞入 `Bean` 里面，
+
+```go
+func Ignite() *Goft {
+	g := &Goft{Engine: gin.New(), beanFactory: NewBeanFactory()}
+	g.Use(ErrorHandler())               // 必须强制加载异常处理中间件
+	config := InitConfig()
+	g.beanFactory.setBean(config) // 配置文件加载进 bean 中
+	if config.Server.Html != "" {
+		g.LoadHTMLGlob(config.Server.Html)
+	}
+	return g
+}
+```
+
+然后来到 `src/goft/Responder.go` ，注册 `ViewResponder` 
+
+```go
+func init() {
+	ResponderList = []Responder{
+		new(StringResponder),
+		new(ModelResponder),
+		new(ModelsResponder),
+		new(ViewResponder),
+	} // 反射不能直接使用类型，提供反射需要的指针
+}
+```
+
+这样在控制器中就支持返回模板
+
+```go
+package classes
+
+import (
+	"gin-up/src/goft"
+)
+
+type IndexClass struct{}
+
+func NewIndexClass() *IndexClass {
+	return &IndexClass{}
+}
+
+// GetIndex 业务方法，函数名根据业务而起
+func (i *IndexClass) GetIndex(ctx *gin.Context) goft.View {
+	return "index"
+}
+
+// Build 把业务的路由隐藏在 Build 函数
+func (i *IndexClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/", i.GetIndex)
+}
+```
+
+运行程序访问 http://localhost:8088/v1/ 可以看到显示的 `html`
+
+代码修改 [git commit]()
 
 
 

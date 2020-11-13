@@ -28,6 +28,7 @@ func GetConfigValue(m UserConfig, prefix []string, index int) interface{} {
 type ServerConfig struct {
 	Port int32
 	Name string
+	Html string
 }
 
 // SysConfig 系统配置

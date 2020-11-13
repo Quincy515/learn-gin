@@ -16,7 +16,11 @@ type Goft struct {
 func Ignite() *Goft {
 	g := &Goft{Engine: gin.New(), beanFactory: NewBeanFactory()}
 	g.Use(ErrorHandler())               // 必须强制加载异常处理中间件
-	g.beanFactory.setBean(InitConfig()) // 配置文件加载进 bean 中
+	config := InitConfig()
+	g.beanFactory.setBean(config) // 配置文件加载进 bean 中
+	if config.Server.Html != "" {
+		g.LoadHTMLGlob(config.Server.Html)
+	}
 	return g
 }
 
