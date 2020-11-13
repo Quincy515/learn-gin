@@ -2898,9 +2898,192 @@ func Task(f TaskFunc, params ...interface{}) {
 
 显示 `"views": 64,` 时，数据库存储的是 `65` ，因为先取出数据再进行任务执行的。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/5a9c31a0ac901f9460825ef0571ad879e972e177#diff-2fb98cca777cba1a79ccacaf10dd23fba7dd59a7c8ac74ddd522908acd65b26aL1)
+
+### 23. 设计简单协程任务组件：改进、支持回调
+
+```go
+func (this *ArticleClass) UpdateView(params ...interface{}) {
+	this.Table("mynews").Where("id=?", params[0]).
+		Update("views", gorm.Expr("views+1"))
+}
+```
+
+在这里如果程序执行时间过长
+
+```go
+func (this *ArticleClass) UpdateView(params ...interface{}) {
+	time.Sleep(time.Second * 3)
+	this.Table("mynews").Where("id=?", params[0]).
+		Update("views", gorm.Expr("views+1"))
+}
+```
+
+运行程序，访问 http://localhost:8088/v1/article/6 再刷新页面，会卡顿，
+
+所以解决方法 1.任务执行增加协程 2.任务加队列。
+
+这里的协程任务，首先执行 `http` 请求，然后参数的任务，如果这个任务比较多，
+
+应该使用 `MQ` 来分体式运行。而不应该使用协程池 `sync.Pool` ，如果比较少，
+
+也没有必要使用协程池来限制。
+
+```go
+package goft
+
+import "sync"
+
+// TaskFunc 任务执行的函数
+type TaskFunc func(params ...interface{})
+
+// taskList 没有初始化的任务列表
+var taskList chan *TaskExecutor
+
+// init 引用包时执行
+func init() {
+	chlist := getTaskList() // 得到任务列表
+	go func() {
+		for t := range chlist {
+			doTask(t)
+		}
+	}()
+}
+
+// doTask  开协程执行任务
+func doTask(t *TaskExecutor) {
+	go func() {
+		defer func() {
+			if t.callback != nil { // 第二个参数运行为 nil
+				t.callback() // 简单的回调
+			}
+		}()
+		t.Exec()
+	}()
+}
+
+var once sync.Once
+
+// getTaskList
+func getTaskList() chan *TaskExecutor {
+	once.Do(func() { // 单例模式
+		// 对 taskList 进行初始化 chan
+		taskList = make(chan *TaskExecutor)
+	})
+	return taskList
+}
+
+// TaskExecutor 任务执行者
+type TaskExecutor struct {
+	f        TaskFunc      // 任务中需要执行的函数
+	p        []interface{} // 任务重需要执行函数的参数
+	callback func()        // 回调
+}
+
+func NewTaskExecutor(f TaskFunc, p []interface{}, callback func()) *TaskExecutor {
+	return &TaskExecutor{f: f, p: p, callback: callback}
+}
+
+// Exec 执行任务
+func (this *TaskExecutor) Exec() {
+	this.f(this.p...)
+}
+
+// Task 对外的方法，当有任务时，把任务塞入任务列表管道
+func Task(f TaskFunc, callback func(), params ...interface{}) {
+	if f == nil { // 第一个参数执行函数不允许为 nil
+		return
+	}
+	go func() {
+		getTaskList() <- NewTaskExecutor(f, params, callback) // 增加任务队列
+	}()
+}
+```
+
+做个简单的测试
+
+```go
+// ArticleDetail 路由到这个方法里面
+func (this *ArticleClass) ArticleDetail(ctx *gin.Context) goft.Model {
+	news := models.NewArticleModel()
+	goft.Error(ctx.ShouldBindUri(news))
+	res := this.Table(news.TableName()).Where("id=?", news.NewsId).Find(news)
+	if res.Error != nil || res.RowsAffected == 0 {
+		goft.Error(errors.New("没有找到记录"))
+	}
+
+	goft.Task(this.UpdateView, this.UpdateViewDone, news.NewsId) // 代表执行一个协程任务
+	return news
+}
+
+// UpdateView 增加点击量
+func (this *ArticleClass) UpdateView(params ...interface{}) {
+	time.Sleep(time.Second * 3)
+	this.Table("mynews").Where("id=?", params[0]).
+		Update("views", gorm.Expr("views+1"))
+}
+
+// UpdateViewDone 测试回调函数
+func (this *ArticleClass) UpdateViewDone() {
+	log.Println("点击量增加结束")
+}
+```
+
+访问页面 http://localhost:8088/v1/article/6 刷新几次之后可以在控制台看到
+
+```shell
+2020/11/14 00:47:20 点击量增加结束
+2020/11/14 00:47:22 点击量增加结束
+2020/11/14 00:47:22 点击量增加结束
+```
+
+如何带参数的回调呢
+
+```go
+func (this *ArticleClass) ArticleDetail(ctx *gin.Context) goft.Model {
+	news := models.NewArticleModel()
+	goft.Error(ctx.ShouldBindUri(news))
+	res := this.Table(news.TableName()).Where("id=?", news.NewsId).Find(news)
+	if res.Error != nil || res.RowsAffected == 0 {
+		goft.Error(errors.New("没有找到记录"))
+	}
+
+	//goft.Task(this.UpdateView, this.UpdateViewDone, news.NewsId) // 代表执行一个协程任务
+	goft.Task(this.UpdateView, func() { // 通过匿名函数带参数
+		this.UpdateViewDoneWithParam(news.NewsId)
+	}, news.NewsId) // 代表执行一个协程任务
+
+	return news
+}
+
+// UpdateView 增加点击量
+func (this *ArticleClass) UpdateView(params ...interface{}) {
+	time.Sleep(time.Second * 3)
+	this.Table("mynews").Where("id=?", params[0]).
+		Update("views", gorm.Expr("views+1"))
+}
+
+// UpdateViewDone 测试回调函数
+func (this *ArticleClass) UpdateViewDone() {
+	log.Println("点击量增加结束")
+}
+
+// UpdateViewDoneWithParam 测试带参数的回调函数
+func (this *ArticleClass) UpdateViewDoneWithParam(id int) {
+	log.Println("点击量增加结束, id 是: ", id)
+}
+```
+
+运行访问页面，多刷新几次看到控制台 
+
+```shell
+2020/11/14 00:51:19 点击量增加结束, id 是:  6
+2020/11/14 00:51:21 点击量增加结束, id 是:  6
+2020/11/14 00:51:22 点击量增加结束, id 是:  6
+2020/11/14 00:51:22 点击量增加结束, id 是:  6
+```
+
 代码变动 [git commit]()
-
-
 
 
 
