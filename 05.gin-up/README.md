@@ -2211,16 +2211,7 @@ func InitConfig() *SysConfig {
 
 ### 19. 模板渲染(1):在gin脚手架中渲染html
 
-```shell
------------------------| 控制器 
----------------------------↓
---------------------------Goft
-------------BeanFactory  Fairing  Annotation
------------（依赖注入）    （中间件）  （注解）
---------------------    Responder
----------------------------↓
-----------------------  Gin 框架
-```
+<img src="../imgs/21_goft.jpg" style="zoom:95%;" />
 
 使用 `Responder` 来扩展 `html` 渲染。
 
@@ -2630,7 +2621,172 @@ func Ignite() *Goft {
 </html>
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e3f59697f1876776154beeb24db218007189a09b#diff-5f86647f5f70db405f26a54014d77b1d15d913f96b612dc6763b8870041577d8L13)
+
+### 21. 脚手架实操演示：快速创建一个新闻详细API
+
+脚手架已经完成一定程度，现在使用这个脚手架快速创建一个新闻详细 API。
+
+新建一个数据表 `mynews` 添加一些数据
+
+#### 1. 创建控制器
+
+在目录 `src/classes` 中创建控制器 `Article.go`
+
+##### 第1步 新建类名并注入 `orm`
+
+```go
+type ArticleClass struct {
+	*goft.GormAdapter
+}
+```
+
+##### 第2步 右击 generate constructor select none
+
+```go
+func NewArticleClass() *ArticleClass {
+	return &ArticleClass{}
+}
+```
+
+##### 第3步 注册路由 输入 `build` 自动生成控制器 `build` 函数
+
+```go
+func (this *ArticleClass) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/article/:id", this.ArticleDetail)
+}
+```
+
+##### 第4步 生成 `detail` 控制器方法，它返回 `goft.Model`
+
+```go
+func (this *ArticleClass) ArticleDetail(ctx *gin.Context) goft.Model {
+
+}
+```
+
+#### 2. 创建数据库模型
+
+在 `src/models` 目录下创建文件 `ArticleMode.go`
+
+##### 第1步 新建数据库模型
+
+```go
+package models
+
+import "time"
+
+type ArticleModel struct {
+	NewsId      int    `json:"id" gorm:"column:id" uri:"id" binding:"required,gt=0"`
+	Newstitle   string `json:"title"`
+	Newscontent string `json:"content"`
+	Views       int    `json:"views"`
+	Addtime     time.Time
+}
+```
+
+##### 第2步 右击 generate constructor select none
+
+```go
+func NewArticleModel() *ArticleModel {
+	return &ArticleModel{}
+}
+```
+
+##### 第3步 写 `TableName()` 数据库表名
+
+```go
+func (ArticleModel) TableName() string {
+	return "mynews"
+}
+```
+
+##### 第4步 继承 `src/goft/Mode.go` 写 `String()` 函数
+
+```go
+func (this *ArticleModel) String() string {
+	return fmt.Sprintf("id: %d, title: %s", this.NewsId, this.Newstitle)
+}
+```
+
+#### 3. 回到控制器
+
+##### 第1步 创建实体 
+
+`news := models.NewArticleModel()`
+
+##### 第2步 绑定，使用 `goft.Error`
+
+`goft.Error(ctx.ShouldBindUri(news))`
+
+##### 第3步 使用 `gorm orm` 
+
+`goft.Error(this.Table("mynews").Where("id=?", news.Id).Find(news).Error)`
+
+注意当 `First`、`Last`、`Take` 方法找不到记录时，`GORM` 会返回 `ErrRecordNotFound` 错误。如果发生了多个错误，你可以通过 `errors.Is` 判断错误是否为 `ErrRecordNotFound`，但是 `Find` 找不到记录时不会报错。所以也要判断 `RowAffected`
+
+```go
+  res := this.Table(news.TableName()).Where("id=?", news.NewsId).Find(news)
+	if res.Error != nil || res.RowsAffected == 0 {
+		goft.Error(errors.New("没有找到记录"))
+	}
+```
+
+##### 第4步返回
+
+`return news`
+
+```go
+func (this *ArticleClass) ArticleDetail(ctx *gin.Context) goft.Model {
+	news := models.NewArticleModel()
+	goft.Error(ctx.ShouldBindUri(news))
+	res := this.Table(news.TableName()).Where("id=?", news.NewsId).Find(news)
+	if res.Error != nil || res.RowsAffected == 0 {
+		goft.Error(errors.New("没有找到记录"))
+	}
+	return news
+}
+```
+
+#### 4. 控制器注入到启动函数
+
+```go
+package main
+
+import (
+	. "gin-up/src/classes"
+	. "gin-up/src/goft"
+	. "gin-up/src/middlewares"
+)
+
+func main() {
+	//GenTplFunc("src/funcs") // 在该参数目录下自动生成 funcmap.go 文件
+	//return
+	Ignite().
+		Beans(NewGormAdapter(), NewXormAdapter()). // 设定数据库 orm 的 Bean，简单的依赖注入
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
+			NewUserClass(), NewArticleClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Launch()
+}
+```
+
+运行程序访问 http://localhost:8088/v1/article/6 可以看到数据
+
+```json
+{
+    "id": 6,
+    "title": "标题6",
+    "content": "内容6",
+    "views": 60,
+    "Addtime": "2020-11-13T22:47:57+08:00"
+}
+```
+
 代码变动 [git commit]()
+
+
 
 
 
