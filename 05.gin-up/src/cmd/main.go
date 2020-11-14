@@ -4,6 +4,7 @@ import (
 	. "gin-up/src/classes"
 	. "gin-up/src/goft"
 	. "gin-up/src/middlewares"
+	"log"
 )
 
 func main() {
@@ -15,5 +16,8 @@ func main() {
 		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
 			NewUserClass(), NewArticleClass()).
 		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Task("0/3 * * * * *", func() {
+			log.Println("执行定时任务")
+		}). // 每隔3秒，执行事件
 		Launch()
 }

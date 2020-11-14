@@ -3083,9 +3083,102 @@ func (this *ArticleClass) UpdateViewDoneWithParam(id int) {
 2020/11/14 00:51:22 点击量增加结束, id 是:  6
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e28217c71fa61e9a8ce336879c55824d509ecdee#diff-2fb98cca777cba1a79ccacaf10dd23fba7dd59a7c8ac74ddd522908acd65b26aL6)
 
+### 24. 给脚手架添加定时任务支持
 
+定时任务和控制器没有什么关系，定时任务随着系统启动，
+
+第三方库 `cron`  https://github.com/robfig/cron
+
+安装 `go get github.com/robfig/cron/v3@v3.0.1`
+
+支持秒级和 Linux cron 表达式，初始化 `MyCorn := cron.New(cron.WithSeconds())`
+
+在 `src/goft/Goft.go` 中新建定时任务函数
+
+```go
+// Task 定时任务
+func (this *Goft) Task(expr string, f func()) *Goft {
+
+}
+```
+
+封装到之前写的协程任务里面 `src/goft/Task.go`
+
+```go
+var (
+	once     sync.Once
+	onceCron sync.Once
+	taskCron *cron.Cron // 定时任务
+)
+...
+// getCronTask 初始化定时任务
+func getCronTask() *cron.Cron {
+	onceCron.Do(func() {
+		taskCron = cron.New(cron.WithSeconds())
+	})
+	return taskCron
+}
+```
+
+然后在 `src/goft/Goft.go` 中增加定时任务
+
+```go
+// Task 增加定时任务
+func (this *Goft) Task(expr string, f func()) *Goft {
+	_, err := getCronTask().AddFunc(expr, f)
+	if err != nil {
+		log.Println(err)
+	}
+	return this
+}
+```
+
+然后就可以在 `Launch()` 中启动定时任务
+
+```go
+func (this *Goft) Launch() {
+	var port int32 = 8080
+	if config := this.beanFactory.GetBean(new(SysConfig)); config != nil {
+		port = config.(*SysConfig).Server.Port
+	}
+	getCronTask().Start()
+	this.Run(fmt.Sprintf(":%d", port))
+}
+```
+
+做一个基本的测试在 `main.go` 中
+
+```go
+package main
+
+import (
+	. "gin-up/src/classes"
+	. "gin-up/src/goft"
+	. "gin-up/src/middlewares"
+	"log"
+)
+
+func main() {
+	//GenTplFunc("src/funcs") // 在该参数目录下自动生成 funcmap.go 文件
+	//return
+	Ignite().
+		Beans(NewGormAdapter(), NewXormAdapter()). // 设定数据库 orm 的 Bean，简单的依赖注入
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
+			NewUserClass(), NewArticleClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Task("0/3 * * * * *", func() {
+			log.Println("执行定时任务")
+		}). // 每隔3秒，执行事件
+		Launch()
+}
+```
+
+这样就可以在脚手架中快速集成定时任务
+
+代码变动 [git commit](
 
 
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gin-up/src/funcs"
 	"github.com/gin-gonic/gin"
+	"log"
 )
 
 // Goft
@@ -32,6 +33,7 @@ func (this *Goft) Launch() {
 	if config := this.beanFactory.GetBean(new(SysConfig)); config != nil {
 		port = config.(*SysConfig).Server.Port
 	}
+	getCronTask().Start()
 	this.Run(fmt.Sprintf(":%d", port))
 }
 
@@ -68,6 +70,15 @@ func (this *Goft) Mount(group string, classes ...IClass) *Goft {
 	for _, class := range classes {
 		class.Build(this)
 		this.beanFactory.inject(class)
+	}
+	return this
+}
+
+// Task 增加定时任务
+func (this *Goft) Task(expr string, f func()) *Goft {
+	_, err := getCronTask().AddFunc(expr, f)
+	if err != nil {
+		log.Println(err)
 	}
 	return this
 }
