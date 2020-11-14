@@ -33,3 +33,7 @@ func NewGormAdapter() *GormAdapter {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 	return &GormAdapter{DB: db}
 }
+
+func (this *GormAdapter) Name() string {
+	return "GormAdapter"
+}

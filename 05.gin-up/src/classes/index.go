@@ -21,3 +21,7 @@ func (i *IndexClass) GetIndex(ctx *gin.Context) goft.View {
 func (i *IndexClass) Build(goft *goft.Goft) {
 	goft.Handle("GET", "/", i.GetIndex)
 }
+
+func (this *IndexClass) Name() string {
+	return "IndexClass"
+}

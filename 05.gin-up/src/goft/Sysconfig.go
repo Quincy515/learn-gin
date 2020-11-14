@@ -37,6 +37,10 @@ type SysConfig struct {
 	Config UserConfig
 }
 
+func (this *SysConfig) Name() string {
+	return "SysConfig"
+}
+
 // NewSysConfig 初始化默认配置
 func NewSysConfig() *SysConfig {
 	return &SysConfig{Server: &ServerConfig{Port: 8080, Name: "goft"}}

@@ -27,32 +27,32 @@ func TestComparableExpr_filter(t *testing.T) {
 	}
 }
 
-func TestExecExpr(t *testing.T) {
-	type args struct {
-		expr string
-		data map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ExecExpr(tt.args.expr, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ExecExpr() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("ExecExpr() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+//func TestExecExpr(t *testing.T) {
+//	type args struct {
+//		expr string
+//		data map[string]interface{}
+//	}
+//	tests := []struct {
+//		name    string
+//		args    args
+//		want    string
+//		wantErr bool
+//	}{
+//		// TODO: Add test cases.
+//	}
+//	for _, tt := range tests {
+//		t.Run(tt.name, func(t *testing.T) {
+//			got, err := ExecExpr(tt.args.expr, tt.args.data)
+//			if (err != nil) != tt.wantErr {
+//				t.Errorf("ExecExpr() error = %v, wantErr %v", err, tt.wantErr)
+//				return
+//			}
+//			if got != tt.want {
+//				t.Errorf("ExecExpr() got = %v, want %v", got, tt.want)
+//			}
+//		})
+//	}
+//}
 
 func TestIsComparableExpr(t *testing.T) {
 	type args struct {

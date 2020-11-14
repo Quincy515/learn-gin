@@ -3481,4 +3481,132 @@ func TestComparableExpr_filter(t *testing.T) {
 
 使用的方法，`fmt.Println(goft.ExecExpr("myage < 20", map[string]interface{}{"myage": 19}))`
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/c88c617ad2e08bc8be6f7a19abb753f8eb2e8664#diff-d06124a85a5a239b20667a21cf5cab1c5e2c19fe3f5ca4d98a4ce9bac5dac0e4R1)
+
+### 27. 在脚手架中集成“表达式”运行(简易)
+
+代码大幅度变动，把表达式运行集成到脚手架中，
+
+上面执行的比较表达式 ，原理上是使用了模板引擎来执行，
+
+`fmt.Println(goft.ExecExpr("myage < 20", map[string]interface{}{"myage": 19}))`
+
+在这个过程中先使用了比较表达式的解析 `ComparableExpr`，其实直接使用模板引擎就可以了。
+
+`fmt.Println(goft.ExecExpr("gt .myage 123", map[string]interface{}{"myage": 19}))`，
+
+如果使用 `"myage < 20"` ，做一次正则的扫描，虽然可阅读性提高了，但执行的性能可能降低。
+
+所以修改代码 `src/goft/ExprParser.go` ，废弃了 `ComparableExpr`
+
+```go
+package goft
+
+import (
+	"bytes"
+	"fmt"
+	"text/template"
+)
+
+type Expr string //表达式类型
+// ExecExpr 执行表达式，临时方法后期需要修改
+func ExecExpr(expr Expr, data map[string]interface{}) (string, error) {
+	tpl := template.New("expr").Funcs(map[string]interface{}{
+		"echo": func(params ...interface{}) interface{} {
+			return fmt.Sprintf("echo:%v", params[0])
+		},
+	})
+
+	t, err := tpl.Parse(fmt.Sprintf("{{%s}}", expr))
+	if err != nil {
+		return "", err
+	}
+	var buf = &bytes.Buffer{}
+	err = t.Execute(buf, data)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+```
+
+按照模板语法可以执行获取结构体的属性值
+
+```go
+package main
+
+import (
+	"fmt"
+	"gin-up/src/goft"
+)
+
+type Me struct{}
+
+func (this *Me) Age() int {
+	return 21
+}
+func main() {
+	fmt.Println(goft.ExecExpr(".me.Age",
+		map[string]interface{}{"myage": 19, "me": &Me{}}))
+}
+```
+
+`fmt.Println(goft.ExecExpr("gt .me.Age .myage",map[string]interface{}{"myage": 19, "me": &Me{}}))`
+
+基于这个集成到脚手架里面去，
+
+先以之前的定时任务为例
+
+```go
+package main
+
+import (
+	. "gin-up/src/classes"
+	. "gin-up/src/goft"
+	. "gin-up/src/middlewares"
+	"log"
+)
+
+func main() {
+	//GenTplFunc("src/funcs") // 在该参数目录下自动生成 funcmap.go 文件
+	//return
+	Ignite().
+		Beans(NewGormAdapter(), NewXormAdapter()). // 设定数据库 orm 的 Bean，简单的依赖注入
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
+			NewUserClass(), NewArticleClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Task("0/3 * * * * *", func() {
+			log.Println("执行定时任务")
+		}). // 每隔3秒，执行事件
+		Launch()
+}
+```
+
+这里的代码 
+
+```go
+		Task("0/3 * * * * *", func() {
+			log.Println("执行定时任务")
+		})
+```
+
+这样写不是特别方便，如果任务比较复杂，比如几十行的代码，
+
+要么封装到外部，要么就是控制器中的某一个方法。
+
+如果这样执行就比较麻烦，因此希望能够支持字符串的形式。
+
+`Task("0/3 * * * * *", "ArticleClass.Task")`
+
+控制器里的定时任务方法
+
+```go
+// Test 控制器里的定时任务方法
+func (this *ArticleClass) Test() interface{}  {
+	log.Println("测试定时任务")
+	return nil
+}
+```
+
+代码大幅度变动看代码提交 [git commit]()

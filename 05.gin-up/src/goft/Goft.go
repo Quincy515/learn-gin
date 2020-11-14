@@ -12,11 +12,12 @@ type Goft struct {
 	*gin.Engine                  // 把 *gin.Engine 放入主类里
 	g           *gin.RouterGroup // 保存 group 对象
 	beanFactory *BeanFactory
+	exprData    map[string]interface{} // 表达式的数据
 }
 
 // Ignite Goft 的构造函数，发射、燃烧，富含激情的意思
 func Ignite() *Goft {
-	g := &Goft{Engine: gin.New(), beanFactory: NewBeanFactory()}
+	g := &Goft{Engine: gin.New(), beanFactory: NewBeanFactory(), exprData: map[string]interface{}{}}
 	g.Use(ErrorHandler()) // 必须强制加载异常处理中间件
 	config := InitConfig()
 	g.beanFactory.setBean(config) // 配置文件加载进 bean 中
@@ -58,8 +59,12 @@ func (this *Goft) Attach(f Fairing) *Goft {
 	return this
 }
 
-// Beans S和定数据库连接对象
-func (this *Goft) Beans(beans ...interface{}) *Goft {
+// Beans 加入 bean 容器
+func (this *Goft) Beans(beans ...Bean) *Goft {
+	// 取出 bean 的名称，加入到 exprData 里面
+	for _, bean := range beans {
+		this.exprData[(bean.Name())] = bean
+	}
 	this.beanFactory.setBean(beans...)
 	return this
 }
@@ -70,13 +75,25 @@ func (this *Goft) Mount(group string, classes ...IClass) *Goft {
 	for _, class := range classes {
 		class.Build(this)
 		this.beanFactory.inject(class)
+		this.Beans(class) // 控制器也作为 bean 加入到 bean 容器
 	}
 	return this
 }
 
-// Task 增加定时任务
-func (this *Goft) Task(expr string, f func()) *Goft {
-	_, err := getCronTask().AddFunc(expr, f)
+// Task 增加定时任务 参数 cron 表示式
+func (this *Goft) Task(cron string, expr interface{}) *Goft {
+	var err error
+	if f, ok := expr.(func()); ok { // 断言 expr 是一个 func
+		_, err = getCronTask().AddFunc(cron, f)
+	} else if exp, ok := expr.(Expr); ok { // 断言 expr 是一个 表达式类型
+		_, err = getCronTask().AddFunc(cron, func() {
+			_, expErr := ExecExpr(exp, this.exprData)
+			if expErr != nil {
+				log.Println(expErr)
+			}
+		})
+	}
+
 	if err != nil {
 		log.Println(err)
 	}

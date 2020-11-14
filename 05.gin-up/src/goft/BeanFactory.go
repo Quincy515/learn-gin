@@ -2,18 +2,22 @@ package goft
 
 import "reflect"
 
+type Bean interface {
+	Name() string // 所有控制器加入到 bean 中，都需要增加 Name() 函数
+}
+
 type BeanFactory struct {
-	beans []interface{}
+	beans []Bean
 }
 
 func NewBeanFactory() *BeanFactory {
-	bf := &BeanFactory{beans: make([]interface{}, 0)}
+	bf := &BeanFactory{beans: make([]Bean, 0)}
 	bf.beans = append(bf.beans, bf)
 	return bf
 }
 
 // setBean 实现简单的依赖注入，往内存中塞入 bean
-func (this *BeanFactory) setBean(beans ...interface{}) {
+func (this *BeanFactory) setBean(beans ...Bean) {
 	this.beans = append(this.beans, beans...)
 }
 
@@ -70,4 +74,8 @@ func (this *BeanFactory) inject(class IClass) {
 			f.Elem().Set(reflect.ValueOf(p).Elem())
 		}
 	}
+}
+
+func (this *BeanFactory) Name() string {
+	return "BeanFactory"
 }

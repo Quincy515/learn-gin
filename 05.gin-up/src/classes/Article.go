@@ -52,6 +52,17 @@ func (this *ArticleClass) UpdateViewDoneWithParam(id int) {
 	log.Println("点击量增加结束, id 是: ", id)
 }
 
+// Test 控制器里的定时任务方法
+func (this *ArticleClass) Test() interface{} {
+	log.Println("测试定时任务")
+	return nil
+}
+
 func (this *ArticleClass) Build(goft *goft.Goft) {
 	goft.Handle("GET", "/article/:id", this.ArticleDetail)
+}
+
+// Name 控制器加入到 bean 中
+func (this *ArticleClass) Name() string {
+	return "ArticleClass"
 }

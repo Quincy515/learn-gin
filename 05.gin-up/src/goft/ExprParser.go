@@ -15,7 +15,8 @@ const (
 	ComparePattern   = `^(` + VarPattern + `)\s*(` + CompareSign + `)\s*(` + VarPattern + `)\s*$`
 )
 
-// 可比较表达式 解析类， 譬如a>3   b!=4 a!=n    a>3  [gt .a  3]
+type Expr string //表达式类型
+//可比较表达式 解析类， 譬如a>3   b!=4 a!=n    a>3  [gt .a  3]
 type ComparableExpr string
 
 // filter 正则的转化 把比较符号 > 换成模板支持的 gt
@@ -35,7 +36,15 @@ func (this ComparableExpr) filter() string {
 	return ""
 }
 
-// getCompareToken 根据比较符 ，获取token
+//普通表达式，如 .user.Age  .user.Info(101)
+type SimpleExpr string
+
+func (this SimpleExpr) filter() string {
+	// 处理括号里面的参数
+	return ""
+}
+
+//根据比较符 ，获取token
 func getCompareToken(sign string) string {
 	for index, item := range strings.Split(CompareSign, "|") {
 		if item == sign {
@@ -64,14 +73,14 @@ func IsComparableExpr(expr string) bool {
 }
 
 // ExecExpr 执行表达式，临时方法后期需要修改
-func ExecExpr(expr string, data map[string]interface{}) (string, error) {
+func ExecExpr(expr Expr, data map[string]interface{}) (string, error) {
 	tpl := template.New("expr").Funcs(map[string]interface{}{
 		"echo": func(params ...interface{}) interface{} {
 			return fmt.Sprintf("echo:%v", params[0])
 		},
 	})
 
-	t, err := tpl.Parse(fmt.Sprintf("{{%s}}", ComparableExpr(expr).filter()))
+	t, err := tpl.Parse(fmt.Sprintf("{{%s}}", expr))
 	if err != nil {
 		return "", err
 	}

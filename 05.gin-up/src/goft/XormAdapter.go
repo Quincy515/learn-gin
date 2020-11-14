@@ -10,6 +10,10 @@ type XormAdapter struct {
 	*xorm.Engine
 }
 
+func (this *XormAdapter) Name() string {
+	return "XormAdapter"
+}
+
 func NewXormAdapter() *XormAdapter {
 	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	engine, err := xorm.NewEngine("mysql", dsn)

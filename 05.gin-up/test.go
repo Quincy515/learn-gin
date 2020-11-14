@@ -5,6 +5,11 @@ import (
 	"gin-up/src/goft"
 )
 
+type Me struct{}
+
+func (this *Me) Age() int {
+	return 21
+}
 func main() {
 	// 使用 go 原生的模板功能，
 	//tpl := template.New("test").Funcs(map[string]interface{}{
@@ -25,5 +30,7 @@ func main() {
 	//}
 	//fmt.Println(buf.String())
 
-	fmt.Println(goft.ExecExpr("myage < 20", map[string]interface{}{"myage": 19}))
+	//fmt.Println(goft.ExecExpr("myage < 20", map[string]interface{}{"myage": 19}))
+	fmt.Println(goft.ExecExpr("gt .me.Age .myage",
+		map[string]interface{}{"myage": 19, "me": &Me{}}))
 }
