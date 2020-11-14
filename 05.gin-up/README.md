@@ -3245,5 +3245,240 @@ func main() {
 
 表达式解析，不太适合在系统运行时执行，更加适合在系统启动时运行。
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/8c3302574f1ae6b5d8caa09f98940dd26dcece57#diff-67dac4d9e81202d43bea15cdac298590a85a46df7f68d9fa7cfefae9f38d176fR1)
 
+### 26. 简易表达式解析(2):可比较表达式解析和执行
+
+![](../imgs/22_expr.jpg)
+
+新建文件 `src/goft/ExprParser.go` 实现可比较表达式的解析，
+
+第一步是通过正则判断是否是比较类型的表达式
+
+```go
+const (
+	VarPattern       = `[0-9a-zA-Z_]+`
+	CompareSign      = ">|>=|<=|<|==|!="
+	CompareSignToken = "gt|ge|le|lt|eq|ne"
+	ComparePattern   = `^(` + VarPattern + `)\s*(` + CompareSign + `)\s*(` + VarPattern + `)\s*$`
+)
+
+// IsComparableExpr 是否是"比较表达式"
+func IsComparableExpr(expr string) bool {
+	reg, err := regexp.Compile(ComparePattern)
+	if err != nil {
+		return false
+	}
+	return reg.MatchString(expr)
+}
+```
+
+完整的 `src/goft/ExprParser.go` 代码
+
+```go
+package goft
+
+import (
+	"bytes"
+	"fmt"
+	"regexp"
+	"strings"
+	"text/template"
+)
+
+const (
+	VarPattern       = `[0-9a-zA-Z_]+`
+	CompareSign      = ">|>=|<=|<|==|!="
+	CompareSignToken = "gt|ge|le|lt|eq|ne"
+	ComparePattern   = `^(` + VarPattern + `)\s*(` + CompareSign + `)\s*(` + VarPattern + `)\s*$`
+)
+
+// 可比较表达式 解析类， 譬如a>3   b!=4 a!=n    a>3  [gt .a  3]
+type ComparableExpr string
+
+// filter 正则的转化 把比较符号 > 换成模板支持的 gt
+func (this ComparableExpr) filter() string {
+	reg, err := regexp.Compile(ComparePattern)
+	if err != nil {
+		return ""
+	}
+	ret := reg.FindStringSubmatch(string(this))
+	if ret != nil && len(ret) == 4 {
+		token := getCompareToken(ret[2])
+		if token == "" {
+			return ""
+		}
+		return fmt.Sprintf("%s %s %s", token, parseToken(ret[1]), parseToken(ret[3]))
+	}
+	return ""
+}
+
+// getCompareToken 根据比较符 ，获取token
+func getCompareToken(sign string) string {
+	for index, item := range strings.Split(CompareSign, "|") {
+		if item == sign {
+			return strings.Split(CompareSignToken, "|")[index]
+		}
+	}
+	return ""
+}
+
+// parseToken 对于数字不加.(点)
+func parseToken(token string) string {
+	if IsNumeric(token) {
+		return token
+	} else {
+		return "." + token
+	}
+}
+
+// IsComparableExpr 是否是"比较表达式"
+func IsComparableExpr(expr string) bool {
+	reg, err := regexp.Compile(ComparePattern)
+	if err != nil {
+		return false
+	}
+	return reg.MatchString(expr)
+}
+
+// ExecExpr 执行表达式，临时方法后期需要修改
+func ExecExpr(expr string, data map[string]interface{}) (string, error) {
+	tpl := template.New("expr").Funcs(map[string]interface{}{
+		"echo": func(params ...interface{}) interface{} {
+			return fmt.Sprintf("echo:%v", params[0])
+		},
+	})
+
+	t, err := tpl.Parse(fmt.Sprintf("{{%s}}", ComparableExpr(expr).filter()))
+	if err != nil {
+		return "", err
+	}
+	var buf = &bytes.Buffer{}
+	err = t.Execute(buf, data)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+```
+
+ 判断是会否是数字的函数 `IsNumeric` 放在 `src/goft/WebUtil.go` 文件中
+
+```go
+// IsNumeric 判断是否数字
+func IsNumeric(val interface{}) bool {
+	switch val.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+	case float32, float64, complex64, complex128:
+		return true
+	case string:
+		str := val.(string)
+		if str == "" {
+			return false
+		}
+		// Trim any whitespace
+		str = strings.Trim(str, " \\t\\n\\r\\v\\f")
+		if str[0] == '-' || str[0] == '+' {
+			if len(str) == 1 {
+				return false
+			}
+			str = str[1:]
+		}
+		// hex
+		if len(str) > 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X') {
+			for _, h := range str[2:] {
+				if !((h >= '0' && h <= '9') || (h >= 'a' && h <= 'f') || (h >= 'A' && h <= 'F')) {
+					return false
+				}
+			}
+			return true
+		}
+		// 0-9,Point,Scientific
+		p, s, l := 0, 0, len(str)
+		for i, v := range str {
+			if v == '.' { // Point
+				if p > 0 || s > 0 || i+1 == l {
+					return false
+				}
+				p = i
+			} else if v == 'e' || v == 'E' { // Scientific
+				if i == 0 || s > 0 || i+1 == l {
+					return false
+				}
+				s = i
+			} else if v < '0' || v > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+```
+
+自动生成测试，在  `src/goft/ExprParser.go`  文件中右击 `Generate` → `Tests for file` 
+
+比如要测试函数 `TestIsComparableExpr` 判断是否是可比较类型，只需要手动加入测试用例即可。
+
+```go
+func TestIsComparableExpr(t *testing.T) {
+	type args struct {
+		expr string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		// TODO: Add test cases.
+		{"w1", args{"a>3"}, true},
+		{"w2", args{"a==3"}, true},
+		{"w3", args{"a>=3"}, true},
+		{"w4", args{"a<3"}, true},
+		{"w5", args{"a>3"}, true},
+		{"w6", args{"a<>3"}, false},
+		{"w7", args{"ab3"}, false},
+		{"w8", args{"7>8"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsComparableExpr(tt.args.expr); got != tt.want {
+				t.Errorf("IsComparableExpr() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+```
+
+判断可比较表达式的解析
+
+```go
+func TestComparableExpr_filter(t *testing.T) {
+	tests := []struct {
+		name string
+		this ComparableExpr
+		want string
+	}{
+		// TODO: Add test cases.
+		{"w1", ComparableExpr("a>3"), "gt .a 3"},
+		{"w2", ComparableExpr("a==3"), "eq .a 3"},
+		{"w3", ComparableExpr("a>=3"), "ge .a 3"},
+		{"w4", ComparableExpr("a<3"), "lt .a 3"},
+		{"w5", ComparableExpr("a>3"), "gt .a 3"},
+		{"w6", ComparableExpr("a<>3"), ""},
+		{"w7", ComparableExpr("ab3"), ""},
+		{"w8", ComparableExpr("7>8"), "gt 7 8"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.this.filter(); got != tt.want {
+				t.Errorf("filter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+```
+
+使用的方法，`fmt.Println(goft.ExecExpr("myage < 20", map[string]interface{}{"myage": 19}))`
+
+代码变动 [git commit]()
