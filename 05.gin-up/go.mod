@@ -3,6 +3,7 @@ module gin-up
 go 1.15
 
 require (
+	github.com/antlr/antlr4 v0.0.0-20201029161626-9a95f0cc3d7c
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/robfig/cron/v3 v3.0.1

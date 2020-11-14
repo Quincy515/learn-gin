@@ -3609,4 +3609,110 @@ func (this *ArticleClass) Test() interface{}  {
 }
 ```
 
-代码大幅度变动看代码提交 [git commit]()
+代码大幅度变动看代码提交 [git commit](https://github.com/custer-go/learn-gin/commit/ec6b56c3fbfc3c00b31b420c5849bc713a4c5548#diff-2fb98cca777cba1a79ccacaf10dd23fba7dd59a7c8ac74ddd522908acd65b26aL52)
+
+### 27. 表达式解析(1):Antlr4介绍、简单示例
+
+之前实现表达式解析，使用的方法是模板引擎，但是这个方式并不是很灵活，而且执行性能比较低，
+
+如果在真实环境中做表达式解析，应该使用的方法
+
+比如说需求是要执行 1+2，传统做法是 
+
+```go
+a:=1
+b:=2
+c:=a+b
+```
+
+如果要执行的是字符串 `str:="1 add 2“` 怎么执行？
+
+之前使用了模板引擎的方式， 但是性能是比较低的。
+
+使用正则也是不现实的，表达式复杂的话，完全是不可用的。
+
+#### Antlr4
+
+> 强大的跨语言语法解析器，可以用来读取、处理、执行或翻译结构化文本或二进制文件。它被广泛用来构建语言，工具和框架。Antlr可以从语法上来生成一个可以构建和遍历解析树的解析器
+>
+>  类似Spark、Elasticsearch 都在使用 
+
+工具本身下载
+
+java实现。因此要自行安装jdk(jre)。
+
+https://www.antlr.org/download/antlr-4.8-complete.jar
+
+Go版本运行时库下载地址
+
+https://github.com/antlr/antlr4/blob/master/doc/go-target.md
+
+执行 `go get github.com/antlr/antlr4/runtime/Go/antlr`
+
+既可以使用 `Antlr4` 工具本身生成 `Go` 代码，也可以直接使用 `Go` 插件，
+
+在 `Goland` 中安装插件 `antlr v4 grammar plugin`
+
+新建文件夹 `test/Calc.g4` 
+
+```g4
+grammar Calc;
+
+// Tokens
+MUL: '*';
+DIV: '/';
+ADD: '+';
+SUB: '-';
+NUMBER: [0-9]+;
+WHITESPACE: [ \r\n\t]+ -> skip;
+
+// Rules
+start : expr EOF;
+
+expr
+   : expr op=('*'|'/') expr # MulDiv
+   | expr op=('+'|'-') expr # AddSub
+   | NUMBER                             # Number
+   ;
+```
+
+在文件名位置右击选择 `Configure ANTLR`
+
+![](../imgs/23_antlr.jpg)
+
+在文件名位置右击选择 `Generate ANTLR Recognizer`，自动生成许多相关文件
+
+测试
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+)
+func main() {
+	is := antlr.NewInputStream("1+2*3")
+	lexer := parser.NewCalcLexer(is) // 获取语法解析器对象
+	for {
+		t := lexer.NextToken()
+		if t.GetTokenType() == antlr.TokenEOF {
+			break
+		}
+		fmt.Printf("%s (%q)\n",
+			lexer.SymbolicNames[t.GetTokenType()], t.GetText())
+	}
+}
+```
+
+运行结果
+
+```bash
+NUMBER ("1")
+ADD ("+")
+NUMBER ("2")
+MUL ("*")
+NUMBER ("3")
+```
+
+代码变动 [git commit]()

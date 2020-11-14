@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"gin-up/src/goft"
+	parser "gin-up/test"
+	"github.com/antlr/antlr4/runtime/Go/antlr"
 )
 
 type Me struct{}
@@ -31,6 +32,16 @@ func main() {
 	//fmt.Println(buf.String())
 
 	//fmt.Println(goft.ExecExpr("myage < 20", map[string]interface{}{"myage": 19}))
-	fmt.Println(goft.ExecExpr("gt .me.Age .myage",
-		map[string]interface{}{"myage": 19, "me": &Me{}}))
+	//fmt.Println(goft.ExecExpr("gt .me.Age .myage",
+	//	map[string]interface{}{"myage": 19, "me": &Me{}}))
+	is := antlr.NewInputStream("1+2*3")
+	lexer := parser.NewCalcLexer(is) // 获取语法解析器对象
+	for {
+		t := lexer.NextToken()
+		if t.GetTokenType() == antlr.TokenEOF {
+			break
+		}
+		fmt.Printf("%s (%q)\n",
+			lexer.SymbolicNames[t.GetTokenType()], t.GetText())
+	}
 }
