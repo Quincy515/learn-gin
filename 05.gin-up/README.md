@@ -3178,7 +3178,72 @@ func main() {
 
 这样就可以在脚手架中快速集成定时任务
 
-代码变动 [git commit](
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/90875d47228d0018e7347547281c60d8b3a1530a#diff-9dc2b1b9bae1a7f587f7bc524f1be8a4e736ea93f487ad5451bd110d682b8f70L4)
 
+### 25. 简易表达式解析器(1):基本原理(思路)
 
+新增**表达式解析器** `Expr` 扩展，
+
+上面实现的定时任务
+
+```go
+func main() {
+	Ignite().
+		Beans(NewGormAdapter(), NewXormAdapter()). // 设定数据库 orm 的 Bean，简单的依赖注入
+		Attach(NewUserMid()). // 带声明周期的中间件
+		Mount("v1", NewIndexClass(), // 控制器，挂载到 v1
+			NewUserClass(), NewArticleClass()).
+		Mount("v2", NewIndexClass()). // 控制器，挂载到 v2
+		Task("0/3 * * * * *", func() {
+			log.Println("执行定时任务")
+		}). // 每隔3秒，执行事件
+		Launch()
+}
+```
+
+如果在启动程序中写很多定时任务函数是不好的，希望通过这种类型，
+
+`.Task("cron 表示式", "需要执行控制器里的某个函数方法名称比如 NewClass.Task")` 宏命令支持元编程。
+
+使用 go 自带的模板功能实现，比如新建 `test.go` 文件
+
+1. 在 `html` 中做网页模板
+2. 生成代码生成器
+3. 表示式解析
+
+```go
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"html/template"
+	"log"
+)
+
+func main() {
+	// 使用 go 原生的模板功能，
+	tpl := template.New("test").Funcs(map[string]interface{}{
+		"echo": func(params ...interface{}) interface{} {
+			return fmt.Sprintf("echo: %v", params[0])
+		},
+	})
+	t, err := tpl.Parse("{{lt .age 20 | echo}}")
+	if err != nil {
+		log.Fatal(err)
+	}
+	var buf = &bytes.Buffer{}
+	err = t.Execute(buf, map[string]interface{}{
+		"age": 19,
+	}) // 执行模板解析
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(buf.String())
+}
+```
+
+表达式解析，不太适合在系统运行时执行，更加适合在系统启动时运行。
+
+代码变动 [git commit]()
 
