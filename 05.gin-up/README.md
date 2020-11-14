@@ -3611,7 +3611,7 @@ func (this *ArticleClass) Test() interface{}  {
 
 代码大幅度变动看代码提交 [git commit](https://github.com/custer-go/learn-gin/commit/ec6b56c3fbfc3c00b31b420c5849bc713a4c5548#diff-2fb98cca777cba1a79ccacaf10dd23fba7dd59a7c8ac74ddd522908acd65b26aL52)
 
-### 27. 表达式解析(1):Antlr4介绍、简单示例
+### 28. 表达式解析(1):Antlr4介绍、简单示例
 
 之前实现表达式解析，使用的方法是模板引擎，但是这个方式并不是很灵活，而且执行性能比较低，
 
@@ -3715,4 +3715,72 @@ MUL ("*")
 NUMBER ("3")
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/8998cdaf48c71132f64f1986f3685cde1ff05b9d#diff-67dac4d9e81202d43bea15cdac298590a85a46df7f68d9fa7cfefae9f38d176fL2)
+
+### 29.  表达式解析(2):加入简单业务逻辑
+
+#### Listener 模式
+
+创建语法解析器和侦听器，通过监听来自树遍历器触发的时间，输出对应的执行结果。
+
+优势：不需要自己遍历树，甚至不需要知道运行时如何调用我们的方法。只需要实现相应的 `listener` 方法就可以。
+
+```go
+package main
+
+import (
+	"fmt"
+	parser "gin-up/test"
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"strconv"
+)
+
+type Me struct{}
+
+func (this *Me) Age() int {
+	return 21
+}
+
+type calcListener struct {
+	*parser.BaseCalcListener
+	nums []int // 保存数据
+}
+
+func (this *calcListener) push(i int) {
+	this.nums = append(this.nums, i)
+}
+func (this *calcListener) pop() int {
+	if len(this.nums) < 1 {
+		panic("unable to pop")
+	}
+	result := this.nums[len(this.nums)-1]
+	this.nums = this.nums[:len(this.nums)-1]
+	return result
+}
+func (this *calcListener) ExitAddSub(ctx *parser.AddSubContext) {
+	n1, n2 := this.pop(), this.pop()
+	switch ctx.GetOp().GetTokenType() {
+	case parser.CalcParserADD:
+		this.push(n1 + n2)
+		break
+	case parser.CalcLexerSUB:
+		this.push(n1 - n2)
+		break
+	}
+}
+func (this *calcListener) ExitNumber(ctx *parser.NumberContext) {
+	num, _ := strconv.Atoi(ctx.GetText())
+	this.nums = append(this.nums, num)
+}
+func main() {
+	is := antlr.NewInputStream("1+2")
+	lexer := parser.NewCalcLexer(is) // 获取语法解析器对象
+	ts := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	p := parser.NewCalcParser(ts)
+	lis := &calcListener{}
+	antlr.ParseTreeWalkerDefault.Walk(lis, p.Start())
+	fmt.Println(lis.pop())
+}
+```
+
+后面实现基于脚手架的工具 代码变动 [git commit]()
