@@ -15,11 +15,6 @@ func main() {
 	}
 	conn,err:=grpc.Dial(":8081",grpc.WithTransportCredentials(creds))
 
-//	creds, err := credentials.NewClientTLSFromFile("keys/grpc.crt", "custer.fun")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -405,5 +405,112 @@ DNS.2 = *.custer.fun
 1. https://www.cnblogs.com/jackluo/p/13841286.html
 2. https://blog.csdn.net/cuichenghd/article/details/109230584
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/44939287307e2434dff0ea176688447398fac992#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L5)
+
+### 05. 让gRPC提供Http服务(初步)
+
+之前在 创建gRPC服务端并运行时的代码是 `rpcServer.Serve(listen)`，
+
+现在替换成提供 HTTP 服务。
+
+```go
+package main
+
+import (
+	"gin-grpc/services"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"log"
+	"net/http"
+)
+
+func main() {
+	creds, err := credentials.NewServerTLSFromFile("keys/test.pem", "keys/test.key")
+	if err != nil {
+		log.Fatal(err)
+	}
+	rpcServer := grpc.NewServer(grpc.Creds(creds))
+	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))
+
+	//listen, _ := net.Listen("tcp", ":8081")
+	//rpcServer.Serve(listen)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		rpcServer.ServeHTTP(writer, request)
+	})
+	httpServer := &http.Server{
+		Addr:    ":8081",
+		Handler: mux,
+	}
+	httpServer.ListenAndServe()
+}
+```
+
+直接使用浏览器访问 http://localhost:8081/ 可以看到 `gRPC requires HTTP/2`
+
+直接使用上面的客户端代码也是访问不了的，会报一个错误
+
+```bash
+time="2020-11-18T13:32:21+08:00" level=fatal msg="rpc error: code = Unavailable desc = connection error: desc = \"transport: authentication handshake failed: tls: first record does not look like a TLS handshake\""
+```
+
+在服务端使用另外的方法启动 `http server`
+
+```go
+package main
+
+import (
+	"fmt"
+	"gin-grpc/services"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"log"
+	"net/http"
+)
+
+func main() {
+	creds, err := credentials.NewServerTLSFromFile("keys/test.pem", "keys/test.key")
+	if err != nil {
+		log.Fatal(err)
+	}
+	rpcServer := grpc.NewServer(grpc.Creds(creds))
+	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))
+
+	//listen, _ := net.Listen("tcp", ":8081")
+	//rpcServer.Serve(listen)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Println(request)
+		rpcServer.ServeHTTP(writer, request)
+	})
+	httpServer := &http.Server{
+		Addr:    ":8081",
+		Handler: mux,
+	}
+	httpServer.ListenAndServeTLS("keys/test.pem", "keys/test.key")
+}
+```
+
+这时再访问浏览器 https://localhost:8081/ 会出现 `invalid gRPC request method`
+
+使用客户端请求可以正常访问，查看控制台。
+
+```go
+&{POST 
+  /services.ProdService/GetProdStock 
+  HTTP/2.0 2 0 
+  map[Content-Type:[application/grpc] 
+      Te:[trailers] 
+      User-Agent:[grpc-go/1.33.2]] 0xc00008e240 <nil> -1 [] false *.custer.fun map[] map[] <nil> map[] 127.0.0.1:56154 /services.ProdService/GetProdStock 0xc000134bb0 <nil> <nil> 0xc00009a080}
+```
+
+以客户端访问，思考：
+
+1. 这个地址 `/services.ProdService/GetProdStock ` 是否可以改变？
+2. 使用普通的 http client 是佛可以调用？
+3. 在 linux 中怎么使用工具进行测试？
+
+
 

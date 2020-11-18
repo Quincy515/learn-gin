@@ -1,11 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"gin-grpc/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"log"
-	"net"
+	"net/http"
 )
 
 func main() {
@@ -13,9 +14,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	rpcServer:=grpc.NewServer(grpc.Creds(creds))
-
+	rpcServer := grpc.NewServer(grpc.Creds(creds))
 	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))
-	listen, _ := net.Listen("tcp", ":8081")
-	rpcServer.Serve(listen)
+
+	//listen, _ := net.Listen("tcp", ":8081")
+	//rpcServer.Serve(listen)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Println(request)
+		rpcServer.ServeHTTP(writer, request)
+	})
+	httpServer := &http.Server{
+		Addr:    ":8081",
+		Handler: mux,
+	}
+	httpServer.ListenAndServeTLS("keys/test.pem", "keys/test.key")
 }
