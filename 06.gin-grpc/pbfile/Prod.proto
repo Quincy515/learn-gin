@@ -1,11 +1,21 @@
 syntax = "proto3";
 package services;
+option go_package = ".;services"; // .代表当前文件夹，分号后面是生成go文件引入的包名
+import "google/api/annotations.proto";
+
 message  ProdRequest {
-  int32 prod_id = 1;   // 传入的商品ID
+  int32 prod_id = 1;   //传入的商品ID
 }
 message ProdResponse{
-  int32 prod_stock = 1;// 商品库存
+  int32 prod_stock = 1;//商品库存
 }
+
 service ProdService {
-  rpc GetProdStock (ProdRequest) returns (ProdResponse);
+  rpc GetProdStock (ProdRequest) returns (ProdResponse){
+    option (google.api.http) = {
+      get: "/v1/prod/{prod_id}"
+    };
+  }
 }
+
+

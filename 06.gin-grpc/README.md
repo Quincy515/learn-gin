@@ -722,4 +722,205 @@ subject=C = cn, OU = custer, O = custer, CN = localhost
 Getting CA Private Key
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/b26d6870d8704d49829756b5b1f281d61eb9f802#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L2)
+
+### 07. 双向认证下rpc-gateway使用（同时提供rpc和http接口)
+
+第三方库 https://github.com/grpc-ecosystem/grpc-gateway
+
+![architecture introduction diagram](https://camo.githubusercontent.com/5fc816f4575582674ed5f7216b7169e1a8496b531007faf2aab07a3b01484d7e/68747470733a2f2f646f63732e676f6f676c652e636f6d2f64726177696e67732f642f3132687034435071724e5046686174744c5f63496f4a707446766c41716d35774c513067677149356d6b43672f7075623f773d37343926683d333730)
+
+在 `grpc` 之上加一层代理并转发，转变成 `protobuf` 格式来访问 `grpc` 服务。
+
+#### 安装
+
+```go
+// +build tools
+
+package tools
+
+import (
+    _ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway"
+    _ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2"
+    _ "google.golang.org/grpc/cmd/protoc-gen-go-grpc"
+    _ "google.golang.org/protobuf/cmd/protoc-gen-go"
+)
+```
+
+Run `go mod tidy` to resolve the versions. Install by running
+
+```
+$ go install \
+    github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway \
+    github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2 \
+    google.golang.org/protobuf/cmd/protoc-gen-go \
+    google.golang.org/grpc/cmd/protoc-gen-go-grpc
+```
+
+This will place four binaries in your `$GOBIN`;
+
+- `protoc-gen-grpc-gateway`
+- `protoc-gen-openapiv2`
+- `protoc-gen-go`
+- `protoc-gen-go-grpc`
+
+Make sure that your `$GOBIN` is in your `$PATH`.
+
+#### 修改 `proto` 文件
+
+为了 `import "google/api/annotations.proto";` 路径
+
+把 `go mod` 中的文件 `/go/pkg/mod/github.com/grpc-ecosystem/grpc-gateway/v2@v2.0.1/third_party/googleapis/google` 放到目录 `pbfile` 中
+
+```bash
+(base)  👍  ~/Work/2020/study/learn-gin/06.gin-grpc   main ±✚  tree .                               
+.
+├── README.md
+├── cert
+├── client
+│   └── main.go
+├── go.mod
+├── go.sum
+├── keys
+├── pbfile
+│   ├── Prod.proto
+│   └── google
+│       ├── api
+│       │   ├── annotations.proto
+│       │   ├── http.proto
+│       │   └── httpbody.proto
+│       └── rpc
+│           ├── code.proto
+│           ├── error_details.proto
+│           └── status.proto
+├── server.go
+└── services
+    ├── Prod.pb.go
+    ├── Prod.pb.gw.go
+    ├── ProdService.go
+    └── pbfile
+        └── Prod
+            └── Prod.pb.gw.go
+```
+
+修改 `.proto` 以实现，比如访问的 url 是 `GET /prod/stock/{}`
+
+```protobuf
+syntax = "proto3";
+package services;
+option go_package = ".;services"; // .代表当前文件夹，分号后面是生成go文件引入的包名
+import "google/api/annotations.proto";
+
+message  ProdRequest {
+  int32 prod_id = 1;   //传入的商品ID
+}
+message ProdResponse{
+  int32 prod_stock = 1;//商品库存
+}
+
+service ProdService {
+  rpc GetProdStock (ProdRequest) returns (ProdResponse){
+    option (google.api.http) = {
+      get: "/v1/prod/{prod_id}"
+    };
+  }
+}
+```
+
+#### 生成两个文件
+
+首先 `cd` 进入 `pbfiles` 目录
+
+- 生成 `Prod.pb.go`
+
+`protoc --go_out=plugins=grpc:../services Prod.proto`
+
+- 生成 `Prod.pb.gw.go`
+
+`protoc --grpc-gateway_out=logtostderr=true:../services Prod.proto`
+
+#### 改造代码
+
+把证书相关的代码移动到 `helper/CertHelper.go` 文件中
+
+```go
+package helper
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"google.golang.org/grpc/credentials"
+	"io/ioutil"
+)
+
+// GetServerCreds 获取服务端证书配置
+func GetServerCreds() credentials.TransportCredentials {
+	cert, _ := tls.LoadX509KeyPair("cert/server.pem", "cert/server.key")
+	certPool := x509.NewCertPool()
+	ca, _ := ioutil.ReadFile("cert/ca.pem")
+	certPool.AppendCertsFromPEM(ca)
+
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert}, //服务端证书
+		ClientAuth:   tls.VerifyClientCertIfGiven,
+		ClientCAs:    certPool,
+	})
+	return creds
+}
+
+// GetClientCreds 获取客户端证书配置
+func GetClientCreds() credentials.TransportCredentials {
+	cert, _ := tls.LoadX509KeyPair("cert/client.pem", "cert/client.key")
+	certPool := x509.NewCertPool()
+	ca, _ := ioutil.ReadFile("cert/ca.pem")
+	certPool.AppendCertsFromPEM(ca)
+
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert}, //客户端证书
+		ServerName:   "localhost",
+		RootCAs:      certPool,
+	})
+	return creds
+}
+```
+
+#### 基于 grpc-gatway 创建 http server
+
+新建文件 `gateway/httpserver.go`
+
+```go
+package main
+
+import (
+	"context"
+	"gin-grpc/helper"
+	"gin-grpc/services"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/grpc"
+	"log"
+	"net/http"
+)
+
+func main() {
+	gwmux := runtime.NewServeMux() // 创建路由                                               
+	opt := []grpc.DialOption{grpc.WithTransportCredentials(helper.GetClientCreds())} // 指定客户端请求时使用的证书
+	err := services.RegisterProdServiceHandlerFromEndpoint(
+		context.Background(), gwmux, "localhost:8081", opt)
+	if err != nil {  //////// 路由 //// grpc 的端口 ////////////
+		log.Fatal(err)
+	}
+	httpServer := &http.Server{
+		Addr:    ":8080", // 对外提供的访问端口
+		Handler: gwmux,
+	}
+	httpServer.ListenAndServe()
+}
+```
+
+- 第1步：启动 `grpc` 服务端
+- 第2步：启动 客户端，可以看到控制台输出
+- 第2步：启动 `gateway` 访问浏览器 http://localhost:8080/v1/prod/3 可以看到  `{ "prodStock": 28 }`
+
+这样就提供了内部 `grpc` 访问，第三方系统接入使用 `api` 访问。
+
 代码变动 [git commit]()
