@@ -1298,5 +1298,43 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/8909dcd7ee33c221b980949641e78a73d8218356#diff-84d5cadaa82f6eeca6dc3d619649d2c2a9176ca7137584962e2235e93101175dL1)
+
+### 12. 语法学习(5)日期类型、创建主订单模型(下)
+
+上面创建好了 订单服务的服务端，下面看下客户端怎么调用，
+
+先把上面新生成的 `Models.pb.go` 文件和 `Orders.pb.go` 文件拷贝到客户端。
+
+然后在客户端中创建新的 `OrdersService`
+
+```go
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(helper.GetClientCreds()))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	ctx := context.Background()
+	t := timestamp.Timestamp{Seconds: time.Now().Unix()}
+	orderClient := services.NewOrderServiceClient(conn)
+	res, _ := orderClient.NewOrder(ctx, &services.OrderMain{
+		OrderId:    1001,
+		OrderNo:    "20201118",
+		OrderMoney: 90,
+		OrderTime:  &t,
+	})
+	fmt.Println(res)
+}
+```
+
+运行客户端，可以看到服务端返回的 `status:"ok"  message:"success"`
+
+在服务端，可以看到客户端的请求数据
+
+ `order_id:1001 order_no:"20201118" order_money:90 order_time:{seconds:1605707319}`
+
 代码变动 [git commit]()
 
