@@ -239,6 +239,8 @@ func main() {
 
 ### 04. 自签证书、服务加入证书验证
 
+免费证书申请 https://freessl.cn/
+
 在生成环境中不能使用自签证书，在云服务器中，单域名可以免费申请 ssl，或者购买。
 
 Windows 下载 `openssl` 工具： http://slproweb.com/products/Win32OpenSSL.html
@@ -515,6 +517,8 @@ func main() {
 代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/040cc1785cb88c8a046ee20bf9cafafc2d2f8fe0#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L15)
 
 ### 06. 使用自签CA、server、Client证书和双向认证
+
+免费证书申请 https://freessl.cn/
 
 之前在客户端代码中也是使用的是服务端 `.crt` 证书或 `.pem`。
 
@@ -1462,4 +1466,58 @@ func main() {
 
 ![](../imgs/25_grpc_gateway.jpg)
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/d88bdbd4487e1e3354e909407412de195847178e#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L22)
+
+### 14. 场景练习(2):POST提交主子订单、嵌套模型
+
+上面设定了主订单模型 `pbfile/Models.proto`
+
+```protobuf
+message OrderMain{//主订单模型
+  int32 order_id = 1;//订单ID，数字自增
+  string order_no = 2; //订单号
+  int32 user_id = 3; //购买者ID
+  float order_money = 4;//商品金额
+  google.protobuf.Timestamp order_time = 5; // 订单时间
+}
+```
+
+下面加入子订单模型 
+
+```protobuf
+message OrderDetail{// 子订单模型
+  int32 detail_id = 1;
+  string order_no = 2;
+  int32 prod_id = 3;
+  float prod_price = 4;
+  int32 prod_num = 5;
+}
+```
+
+修改主订单，嵌套子订单
+
+```protobuf
+message OrderMain{//主订单模型
+  int32 order_id = 1;//订单ID，数字自增
+  string order_no = 2; //订单号
+  int32 user_id = 3; //购买者ID
+  float order_money = 4;//商品金额
+  google.protobuf.Timestamp order_time = 5; // 订单时间
+  repeated OrderDetail order_detail = 6; // 嵌套子订单
+}
+```
+
+执行 `gen proto` 生成 `.pb.go`
+
+`protoc --go_out=plugins=grpc:../services Models.proto`
+
+重新运行 `grpc` 服务端可 `gateway httpserver`，可以和之前一样只提交主订单数据
+
+![](../imgs/25_grpc_gateway.jpg)
+
+发送嵌套订单
+
+![](../imgs/26_grpc_gateway.jpg)
+
 代码变动 [git commit]()
+
