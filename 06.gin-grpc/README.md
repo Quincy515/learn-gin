@@ -923,4 +923,110 @@ func main() {
 
 这样就提供了内部 `grpc` 访问，第三方系统接入使用 `api` 访问。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/9451ed43c13ffd19d42a742b130544c193089cd7#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L2)
+
+### 08. 语法速学(1):返回商品”数组”、repeated修饰符
+
+#### 第1步：写 `.proto` 文件
+
+之前实现的是 传入一个商品 ID `ProdRequest` 获取一个商品库存 `ProdResponse`。
+
+如果需要获取 一堆商品的库存列表呢?
+
+```protobuf
+syntax = "proto3";
+package services;
+option go_package = ".;services"; // .代表当前文件夹，分号后面是生成go文件引入的包名
+import "google/api/annotations.proto";
+
+message  ProdRequest {
+  int32 prod_id = 1;   // 传入的商品ID
+}
+message ProdResponse{
+  int32 prod_stock = 1; // 商品库存
+}
+message QuerySize {
+  int32 size = 1; // 页尺寸
+}
+message ProdResponseList { // 使用修饰符返回商品库存列表
+  repeated ProdResponse prodres = 1;
+} // 修饰符  类名          变量名   顺序
+service ProdService {
+  rpc GetProdStock (ProdRequest) returns (ProdResponse){
+    option (google.api.http) = {
+      get: "/v1/prod/{prod_id}"
+    };
+  }
+
+  rpc GetProdStocks(QuerySize)returns (ProdResponseList) {}
+}
+```
+
+`Repeated`:是一个修饰符,返回字段可以重复任意多次(包括0次)，可以认为就是一个数组(切片)。
+
+#### 第2步：生成 `.pb.go` 文件
+
+`protoc --go_out=plugins=grpc:../services Prod.proto`
+
+#### 第3步：在 `services/ProdService.go` 中实现
+
+```go
+package services
+
+import "context"
+
+type ProdService struct{}
+
+func (this *ProdService) GetProdStock(ctx context.Context, request *ProdRequest) (*ProdResponse, error) {
+	return &ProdResponse{ProdStock: 28}, nil
+}
+
+func (this *ProdService) GetProdStocks(context.Context, *QuerySize) (*ProdResponseList, error) {
+	Prodres := []*ProdResponse{
+		&ProdResponse{ProdStock: 28},
+		&ProdResponse{ProdStock: 29},
+		&ProdResponse{ProdStock: 30},
+		&ProdResponse{ProdStock: 31},
+	}
+	return &ProdResponseList{Prodres: Prodres}, nil
+}
+```
+
+完成服务端代码
+
+#### 第4步：拷贝 `.pd.go` 文件到客户端
+
+#### 第5步：修改客户端代码
+
+```go
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(helper.GetClientCreds()))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	prodClient := services.NewProdServiceClient(conn)
+	//prodRes, err := prodClient.GetProdStock(context.Background(), &services.ProdRequest{ProdId: 12})
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//log.Info(prodRes.ProdStock)
+	res, err := prodClient.GetProdStocks(context.Background(), &services.QuerySize{Size: 10})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(res.Prodres)
+	fmt.Println(res.Prodres[2].ProdStock)
+}
+```
+
+启动服务端和客户端，可以看到控制台信息
+
+```bash
+[prod_stock:28 prod_stock:29 prod_stock:30 prod_stock:31]
+30
+```
+
 代码变动 [git commit]()

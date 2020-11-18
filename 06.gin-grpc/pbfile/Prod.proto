@@ -4,18 +4,25 @@ option go_package = ".;services"; // .代表当前文件夹，分号后面是生
 import "google/api/annotations.proto";
 
 message  ProdRequest {
-  int32 prod_id = 1;   //传入的商品ID
+  int32 prod_id = 1;   // 传入的商品ID
 }
 message ProdResponse{
-  int32 prod_stock = 1;//商品库存
+  int32 prod_stock = 1; // 商品库存
 }
-
+message QuerySize {
+  int32 size = 1; // 页尺寸
+}
+message ProdResponseList { // 使用修饰符返回商品库存列表
+  repeated ProdResponse prodres = 1;
+} // 修饰符  类名          变量名   顺序
 service ProdService {
   rpc GetProdStock (ProdRequest) returns (ProdResponse){
     option (google.api.http) = {
       get: "/v1/prod/{prod_id}"
     };
   }
+
+  rpc GetProdStocks(QuerySize)returns (ProdResponseList) {}
 }
 
 
