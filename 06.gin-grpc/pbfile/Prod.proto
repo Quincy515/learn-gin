@@ -3,16 +3,23 @@ package services;
 option go_package = ".;services"; // .代表当前文件夹，分号后面是生成go文件引入的包名
 import "google/api/annotations.proto";
 
+enum ProdAreas {
+  A = 0; // 第一个必须是 0 表示默认值
+  B = 1;
+  C = 2;
+}
+
 message  ProdRequest {
   int32 prod_id = 1;   // 传入的商品ID
+  ProdAreas prod_area = 2; // 传入商品区域
 }
-message ProdResponse{
+message ProdResponse {
   int32 prod_stock = 1; // 商品库存
 }
 message QuerySize {
   int32 size = 1; // 页尺寸
 }
-message ProdResponseList { // 使用修饰符返回商品库存列表
+message ProdResponseList {// 使用修饰符返回商品库存列表
   repeated ProdResponse prodres = 1;
 } // 修饰符  类名          变量名   顺序
 service ProdService {
@@ -22,7 +29,7 @@ service ProdService {
     };
   }
 
-  rpc GetProdStocks(QuerySize)returns (ProdResponseList) {}
+  rpc GetProdStocks(QuerySize) returns (ProdResponseList) {}
 }
 
 

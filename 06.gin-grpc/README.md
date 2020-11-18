@@ -1029,4 +1029,116 @@ func main() {
 30
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/26133a2e3ffb48a2989a61520fe0871bfbb4ff07#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L2)
+
+### 09. 语法速学(2): 使用枚举、获取分区商品库存
+
+商品有区域之分譬如
+
+-------------------------/  A 区有 10 个
+
+ ID 为101 的商品  -  B 区有 12 个
+
+--------------------------\ C 区有 20 个
+
+加入枚举类型
+
+```protobuf
+enum ProdAreas{
+    A=0;
+    B=1;
+    C=2;
+}
+```
+
+修改 `pbfile/Prod.proto`
+
+```protobuf
+syntax = "proto3";
+package services;
+option go_package = ".;services"; // .代表当前文件夹，分号后面是生成go文件引入的包名
+import "google/api/annotations.proto";
+
+enum ProdAreas {
+  A = 0; // 第一个必须是 0 表示默认值
+  B = 1;
+  C = 2;
+}
+
+message  ProdRequest {
+  int32 prod_id = 1;   // 传入的商品ID
+  ProdAreas prod_area = 2; // 传入商品区域
+}
+message ProdResponse {
+  int32 prod_stock = 1; // 商品库存
+}
+message QuerySize {
+  int32 size = 1; // 页尺寸
+}
+message ProdResponseList {// 使用修饰符返回商品库存列表
+  repeated ProdResponse prodres = 1;
+} // 修饰符  类名          变量名   顺序
+service ProdService {
+  rpc GetProdStock (ProdRequest) returns (ProdResponse){
+    option (google.api.http) = {
+      get: "/v1/prod/{prod_id}"
+    };
+  }
+
+  rpc GetProdStocks(QuerySize) returns (ProdResponseList) {}
+}
+```
+
+修改实现函数 `services/ProdService.go`
+
+```go
+package services
+
+import "context"
+
+type ProdService struct{}
+
+func (this *ProdService) GetProdStock(ctx context.Context, request *ProdRequest) (*ProdResponse, error) {
+	var stock int32 = 0
+	if request.ProdArea == ProdAreas_A {
+		stock = 39
+	} else if request.ProdArea == ProdAreas_B {
+		stock = 41
+	} else {
+		stock = 20
+	}
+	return &ProdResponse{ProdStock: stock}, nil
+}
+
+func (this *ProdService) GetProdStocks(context.Context, *QuerySize) (*ProdResponseList, error) {
+	Prodres := []*ProdResponse{
+		&ProdResponse{ProdStock: 28},
+		&ProdResponse{ProdStock: 29},
+		&ProdResponse{ProdStock: 30},
+		&ProdResponse{ProdStock: 31},
+	}
+	return &ProdResponseList{Prodres: Prodres}, nil
+}
+```
+
+拷贝新生成的 `Prod.pb.go` 文件到客户端
+
+```go
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(helper.GetClientCreds()))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	prodClient := services.NewProdServiceClient(conn)
+	prodRes, err := prodClient.GetProdStock(context.Background(), &services.ProdRequest{ProdId: 12, ProdArea: services.ProdAreas_B})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Info(prodRes.ProdStock)
+}
+```
+
 代码变动 [git commit]()
