@@ -22,11 +22,13 @@ func main() {
 	ctx := context.Background()
 	t := timestamp.Timestamp{Seconds: time.Now().Unix()}
 	orderClient := services.NewOrderServiceClient(conn)
-	res, _ := orderClient.NewOrder(ctx, &services.OrderMain{
-		OrderId:    1001,
-		OrderNo:    "20201118",
-		OrderMoney: 90,
-		OrderTime:  &t,
+	res, _ := orderClient.NewOrder(ctx, &services.OrderRequest{
+		OrderMain: &services.OrderMain{
+			OrderId:    1001,
+			OrderNo:    "20201118",
+			OrderMoney: 90,
+			OrderTime:  &t,
+		},
 	})
 	fmt.Println(res)
 	//prodClient := services.NewProdServiceClient(conn)

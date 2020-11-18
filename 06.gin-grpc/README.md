@@ -1336,5 +1336,130 @@ func main() {
 
  `order_id:1001 order_no:"20201118" order_money:90 order_time:{seconds:1605707319}`
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/dfcfcd65cc9c4caa0d22feaeae355dda8b36d02e#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L2)
 
+### 13. 场景练习(1):POST提交主订单数据(gateway实现http api)
+
+在 `pbfile/Orders.proto` 里增加 `POST` 请求
+
+```protobuf
+syntax = "proto3";
+package services;
+option go_package = ".;services";
+import "Models.proto";
+import "google/api/annotations.proto";
+
+message OrderRequest {
+  OrderMain order_main = 1;
+}
+
+message OrderResponse {
+  string status = 1;
+  string message = 2;
+}
+
+service OrderService {
+  rpc NewOrder(OrderRequest) returns (OrderResponse) {
+    option(google.api.http) = {
+      post: "/v1/order"
+      body: "order_main" // 提交参数
+    } ;
+  }
+}
+```
+
+使用 `grpc-gateway` 编译出两种 `.pb.go` 文件
+
+`protoc --go_out=plugins=grpc:../services Orders.proto`
+
+`protoc --grpc-gateway_out=logtostderr=true:../services Orders.proto`
+
+`protoc --grpc-gateway_out=logtostderr=true:../services Prod.proto `
+
+修改 `services/OrdersService.go`
+
+```go
+package services
+
+import (
+	"context"
+	"fmt"
+)
+
+type OrderService struct{}
+
+func (this *OrderService) NewOrder(ctx context.Context, orderRequest *OrderRequest) (*OrderResponse, error) {
+	fmt.Println(orderRequest.OrderMain)
+	return &OrderResponse{
+		Status:  "ok",
+		Message: "success",
+	}, nil
+}
+```
+
+修改客户端调用的请求参数
+
+```go
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(helper.GetClientCreds()))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	ctx := context.Background()
+	t := timestamp.Timestamp{Seconds: time.Now().Unix()}
+	orderClient := services.NewOrderServiceClient(conn)
+	res, _ := orderClient.NewOrder(ctx, &services.OrderRequest{
+		OrderMain: &services.OrderMain{
+			OrderId:    1001,
+			OrderNo:    "20201118",
+			OrderMoney: 90,
+			OrderTime:  &t,
+		},
+	})
+	fmt.Println(res)
+}
+```
+
+新增 `OrderService` 网关，修改代码 `gateway/httpserver.go`
+
+```go
+func main() {
+	gwmux := runtime.NewServeMux() // 创建路由
+	gRpcEndPoint := "localhost:8081"
+	opt := []grpc.DialOption{grpc.WithTransportCredentials(helper.GetClientCreds())} // 指定客户端请求时使用的证书
+	err := services.RegisterProdServiceHandlerFromEndpoint(
+		context.Background(), gwmux, gRpcEndPoint, opt)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = services.RegisterOrderServiceHandlerFromEndpoint(
+		context.Background(), gwmux, gRpcEndPoint, opt)
+	if err != nil {
+		log.Fatal(err)
+	}
+	httpServer := &http.Server{
+		Addr:    ":8080",
+		Handler: gwmux,
+	}
+	httpServer.ListenAndServe()
+}
+```
+
+先启动 `grpc` 的 `server` ，再启动 `gateway/httpservver.go`
+
+打开浏览器访问 http://localhost:8080/v1/prod/123 可以看到 '
+
+```json
+{
+	"prodStock": 39
+}
+```
+
+发送 `POST` 请求
+
+![](../imgs/25_grpc_gateway.jpg)
+
+代码变动 [git commit]()

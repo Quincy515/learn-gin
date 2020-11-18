@@ -11,10 +11,16 @@ import (
 )
 
 func main() {
-	gwmux := runtime.NewServeMux()                                                   // 创建路由
+	gwmux := runtime.NewServeMux() // 创建路由
+	gRpcEndPoint := "localhost:8081"
 	opt := []grpc.DialOption{grpc.WithTransportCredentials(helper.GetClientCreds())} // 指定客户端请求时使用的证书
 	err := services.RegisterProdServiceHandlerFromEndpoint(
-		context.Background(), gwmux, "localhost:8081", opt)
+		context.Background(), gwmux, gRpcEndPoint, opt)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = services.RegisterOrderServiceHandlerFromEndpoint(
+		context.Background(), gwmux, gRpcEndPoint, opt)
 	if err != nil {
 		log.Fatal(err)
 	}
