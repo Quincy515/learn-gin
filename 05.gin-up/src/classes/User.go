@@ -53,7 +53,7 @@ func (this *UserClass) UserDetail(c *gin.Context) goft.Model {
 }
 
 func (this *UserClass) Build(goft *goft.Goft) {
-	goft.Handle("GET", "/test", this.UserTest).
+	goft.Handle("GET", "/client", this.UserTest).
 		Handle("GET", "/userlist", this.UserList).
 		Handle("GET", "/user/:id", this.UserDetail)
 }

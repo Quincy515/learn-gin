@@ -1,4 +1,4 @@
-// Code generated from /Users/tianxiaoqiang/Work/2020/study/learn-gin/05.gin-up/test/Calc.g4 by ANTLR 4.8. DO NOT EDIT.
+// Code generated from /Users/tianxiaoqiang/Work/2020/study/learn-gin/05.gin-up/client/Calc.g4 by ANTLR 4.8. DO NOT EDIT.
 
 package parser
 

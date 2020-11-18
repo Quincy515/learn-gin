@@ -15,7 +15,7 @@ func (this *XormAdapter) Name() string {
 }
 
 func NewXormAdapter() *XormAdapter {
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
 	engine, err := xorm.NewEngine("mysql", dsn)
 	if err != nil {
 		log.Fatal(err)

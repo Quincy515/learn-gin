@@ -16,7 +16,7 @@ var FuncMap = map[string]interface{} {
 },
   
    "Test" :func () string {
-	return "test"
+	return "client"
 },
   
 }

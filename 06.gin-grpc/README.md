@@ -425,7 +425,7 @@ import (
 )
 
 func main() {
-	creds, err := credentials.NewServerTLSFromFile("keys/test.pem", "keys/test.key")
+	creds, err := credentials.NewServerTLSFromFile("keys/client.pem", "keys/client.key")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -470,7 +470,7 @@ import (
 )
 
 func main() {
-	creds, err := credentials.NewServerTLSFromFile("keys/test.pem", "keys/test.key")
+	creds, err := credentials.NewServerTLSFromFile("keys/client.pem", "keys/client.key")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -489,7 +489,7 @@ func main() {
 		Addr:    ":8081",
 		Handler: mux,
 	}
-	httpServer.ListenAndServeTLS("keys/test.pem", "keys/test.key")
+	httpServer.ListenAndServeTLS("keys/client.pem", "keys/client.key")
 }
 ```
 
@@ -512,5 +512,214 @@ func main() {
 2. 使用普通的 http client 是佛可以调用？
 3. 在 linux 中怎么使用工具进行测试？
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/040cc1785cb88c8a046ee20bf9cafafc2d2f8fe0#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L15)
 
+### 06. 使用自签CA、server、Client证书和双向认证
 
+之前在客户端代码中也是使用的是服务端 `.crt` 证书或 `.pem`。
+
+在实际开发中，内置服务的调用，需要双向验证，客户端和服务端都必须要有各个的证书。
+
+新建目录来生成证书 `key`
+
+#### 使用CA证书
+
+- 根证书（root certificate）是属于根证书颁发机构（CA）的公钥证书。 用以验证它所签发的证书（客户端、服务端）
+- 1、`openssl genrsa -out ca.key 2048`
+- 2、`openssl req -new -x509 -days 3650 -key ca.key -out ca.pem`
+
+```bash
+👍 openssl req -new -x509 -days 3650 -key ca.key -out ca.pem
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:cn
+State or Province Name (full name) [Some-State]:shanghai
+Locality Name (eg, city) []:shanghai
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:custer
+Organizational Unit Name (eg, section) []:custer
+Common Name (e.g. server FQDN or YOUR name) []:localhost
+Email Address []:
+```
+
+生成 `ca.pem` 文件。
+
+#### 重新生成服务端证书
+
+- 1、`openssl genrsa -out server.key 2048`
+- 2、`openssl req -new -key server.key -out server.csr`
+-  注意 `common name` 请填写 `localhost`
+- 3、`openssl x509 -req -sha256 -CA ca.pem -CAkey ca.key -CAcreateserial -days 3650 -in server.csr -out server.pem`
+
+ #### 生成客户端
+
+- 1、`openssl ecparam -genkey -name secp384r1 -out client.key`
+- 2、`openssl req -new -key client.key -out client.csr`
+- 3、`openssl x509 -req -sha256 -CA ca.pem -CAkey ca.key -CAcreateserial -days 3650 -in client.csr -out client.pem`
+
+程序中重新覆盖 `server.crt` 和 `server.key`
+
+#### 服务端拷贝证书文件
+
+新建文件夹 `cert`，用来存放自签 ca 双向认证证书
+
+在服务端，需要拷贝 `server.key` `server.pem` `ca.pem` 这三个证书。
+
+#### 服务端代码改造
+
+```go
+package main
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"gin-grpc/services"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"io/ioutil"
+	"net/http"
+)
+
+func main() {
+	//creds, err := credentials.NewServerTLSFromFile("keys/client.pem", "keys/client.key")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	cert, _ := tls.LoadX509KeyPair("cert/server.pem", "cert/server.key")
+	certPool := x509.NewCertPool()
+	ca, _ := ioutil.ReadFile("cert/ca.pem")
+	certPool.AppendCertsFromPEM(ca)
+
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    certPool,
+	})
+	rpcServer := grpc.NewServer(grpc.Creds(creds))
+
+	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))
+
+	//listen, _ := net.Listen("tcp", ":8081")
+	//rpcServer.Serve(listen)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Println(request)
+		rpcServer.ServeHTTP(writer, request)
+	})
+	httpServer := &http.Server{
+		Addr:    ":8081",
+		Handler: mux,
+	}
+	httpServer.ListenAndServeTLS("keys/client.pem", "keys/client.key")
+}
+```
+
+#### 客户端证书拷贝
+
+拷贝 `client.key` `client.pem` `ca.pem` 证书到客户端 `cert` 目录下
+
+#### 客户端代码改造
+
+```go
+package main
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"gin-grpc/services"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"io/ioutil"
+)
+
+func main() {
+	//creds, err := credentials.NewClientTLSFromFile("keys/client.pem", "*.custer.fun")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	cert, _ := tls.LoadX509KeyPair("cert/client.pem", "cert/client.key")
+	certPool := x509.NewCertPool()
+	ca, _ := ioutil.ReadFile("cert/ca.pem")
+	certPool.AppendCertsFromPEM(ca)
+
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ServerName:   "localhost",
+		RootCAs:      certPool,
+	})
+
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(creds))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	prodClient := services.NewProdServiceClient(conn)
+	prodRes, err := prodClient.GetProdStock(context.Background(), &services.ProdRequest{ProdId: 12})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Info(prodRes.ProdStock)
+}
+```
+
+按照 Go 1.15 生成 SAN 证书
+
+```bash
+第1步：生成 CA 根证书
+👍 openssl genrsa -out ca.key 2048
+Generating RSA private key, 2048 bit long modulus (2 primes)
+.............+++++
+..................................................................................................................+++++
+e is 65537 (0x010001)
+👍 openssl req -new -x509 -days 3650 -key ca.key -out ca.pem
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:cn
+State or Province Name (full name) [Some-State]:shanghai
+Locality Name (eg, city) []:shanghai
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:custer
+Organizational Unit Name (eg, section) []:custer
+Common Name (e.g. server FQDN or YOUR name) []:localhost
+Email Address []:
+      
+第2步：生成服务端证书      
+👍 openssl genpkey -algorithm RSA -out server.key
+........................................................................................+++++
+.......................................+++++
+👍 openssl req -new -nodes -key server.key -out server.csr -days 3650 -subj "/C=cn/OU=custer/O=custer/CN=localhost" -config ./openssl.cnf -extensions v3_req
+Ignoring -days; not generating a certificate
+👍 openssl x509 -req -days 3650 -in server.csr -out server.pem -CA ca.pem -CAkey ca.key -CAcreateserial -extfile ./openssl.cnf -extensions v3_req
+Signature ok
+subject=C = cn, OU = custer, O = custer, CN = localhost
+Getting CA Private Key
+
+第3步：生成客户端证书
+👍 openssl genpkey -algorithm RSA -out client.key
+........+++++
+...........+++++
+👍 openssl req -new -nodes -key client.key -out client.csr -days 3650 -subj "/C=cn/OU=custer/O=custer/CN=localhost" -config ./openssl.cnf -extensions v3_req
+Ignoring -days; not generating a certificate
+👍 openssl x509 -req -days 3650 -in client.csr -out client.pem -CA ca.pem -CAkey ca.key -CAcreateserial -extfile ./openssl.cnf -extensions v3_req
+Signature ok
+subject=C = cn, OU = custer, O = custer, CN = localhost
+Getting CA Private Key
+```
+
+代码变动 [git commit]()
