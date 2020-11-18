@@ -1,6 +1,8 @@
 package services
 
-import "context"
+import (
+	"context"
+)
 
 type ProdService struct{}
 
@@ -24,4 +26,13 @@ func (this *ProdService) GetProdStocks(context.Context, *QuerySize) (*ProdRespon
 		&ProdResponse{ProdStock: 31},
 	}
 	return &ProdResponseList{Prodres: Prodres}, nil
+}
+
+func (this *ProdService) GetProdInfo(ctx context.Context, in *ProdRequest) (*ProdModel, error) {
+	ret := ProdModel{
+		ProdId:    101,
+		ProdName:  "测试商品",
+		ProdPrice: 20.5,
+	}
+	return &ret, nil
 }

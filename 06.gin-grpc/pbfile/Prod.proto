@@ -2,7 +2,7 @@ syntax = "proto3";
 package services;
 option go_package = ".;services"; // .代表当前文件夹，分号后面是生成go文件引入的包名
 import "google/api/annotations.proto";
-
+import "Models.proto";
 enum ProdAreas {
   A = 0; // 第一个必须是 0 表示默认值
   B = 1;
@@ -30,6 +30,7 @@ service ProdService {
   }
 
   rpc GetProdStocks(QuerySize) returns (ProdResponseList) {}
+  rpc GetProdInfo(ProdRequest) returns (ProdModel) {}
 }
 
 

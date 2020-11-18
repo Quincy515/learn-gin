@@ -1033,6 +1033,8 @@ func main() {
 
 ### 09. 语法速学(2): 使用枚举、获取分区商品库存
 
+**创建枚举类型，支持分区枚举参数**
+
 商品有区域之分譬如
 
 -------------------------/  A 区有 10 个
@@ -1141,4 +1143,73 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/91b9a48350105a3b8ddef0a8ad248601fbb9e8bf#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L2)
+
+### 10. 语法速学(3): 导入外部Proto、获取商品信息
+
+新建文件专门存放实体 `pbfile/Models.proto`
+
+```protobuf
+syntax = "proto3";
+package services; // 可以相同的包，也可以不同
+option go_package = ".;services";
+message ProdModel { // 商品模型
+  int32 prod_id = 1;
+  string prod_name = 2;
+  float prod_price = 3;
+}
+```
+
+外部引用
+
+```go
+import "Models.proto";
+...
+	rpc GetProdInfo(ProdRequest) returns (ProdModel) {}
+```
+
+生成 `.pb.go` 文件
+
+`protoc --go_out=plugins=grpc:../services Prod.proto`
+
+`protoc --go_out=plugins=grpc:../services Models.proto`
+
+在 `services/ProdService.go` 文件中实现
+
+```go
+func (this *ProdService) GetProdInfo(ctx context.Context, in *ProdRequest) (*ProdModel, error) {
+	ret := ProdModel{
+		ProdId:    101,
+		ProdName:  "测试商品",
+		ProdPrice: 20.5,
+	}
+	return &ret, nil
+}
+```
+
+拷贝两个新生成的 `.pb.go` 文件到客户端
+
+修改客户端代码
+
+```go
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(helper.GetClientCreds()))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	prodClient := services.NewProdServiceClient(conn)
+	// 获取商品库存
+	//prodRes, err := prodClient.GetProdStock(context.Background(), &services.ProdRequest{ProdId: 12, ProdArea: services.ProdAreas_B})
+	prodRes, err := prodClient.GetProdInfo(context.Background(), &services.ProdRequest{ProdId: 12})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Info(prodRes)
+}
+```
+
 代码变动 [git commit]()
+

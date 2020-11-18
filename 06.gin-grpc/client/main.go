@@ -17,11 +17,13 @@ func main() {
 	defer conn.Close()
 
 	prodClient := services.NewProdServiceClient(conn)
-	prodRes, err := prodClient.GetProdStock(context.Background(), &services.ProdRequest{ProdId: 12, ProdArea: services.ProdAreas_B})
+	// 获取商品库存
+	//prodRes, err := prodClient.GetProdStock(context.Background(), &services.ProdRequest{ProdId: 12, ProdArea: services.ProdAreas_B})
+	prodRes, err := prodClient.GetProdInfo(context.Background(), &services.ProdRequest{ProdId: 12})
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Info(prodRes.ProdStock)
+	log.Info(prodRes)
 	//res, err := prodClient.GetProdStocks(context.Background(), &services.QuerySize{Size: 10})
 	//if err != nil {
 	//	log.Fatal(err)
