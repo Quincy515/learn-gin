@@ -3783,4 +3783,5 @@ func main() {
 }
 ```
 
-后面实现基于脚手架的工具 代码变动 [git commit]()
+后面实现基于脚手架的工具 代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/af7b07d9bd994326a408fc5fbf56b234d25f4887#diff-67dac4d9e81202d43bea15cdac298590a85a46df7f68d9fa7cfefae9f38d176fL4)
+
