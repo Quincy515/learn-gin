@@ -145,6 +145,10 @@ type ProdServiceClient interface {
 	GetProdStock(ctx context.Context, in *ProdRequest, opts ...grpc.CallOption) (*ProdResponse, error)
 }
 ...
+func NewProdServiceClient(cc *grpc.ClientConn) ProdServiceClient {
+	return &prodServiceClient{cc}
+}
+...
 // ProdServiceServer is the server API for ProdService service.
 type ProdServiceServer interface {
 	GetProdStock(context.Context, *ProdRequest) (*ProdResponse, error)
@@ -173,7 +177,7 @@ func (this *ProdService) GetProdStock(ctx context.Context, request *ProdRequest)
 }
 ```
 
-#### 第4步：启动服务
+#### 第4步：创建 grpc 服务端并运行
 
 新建文件 `gin-grpc/server.go`
 
@@ -191,6 +195,43 @@ func main() {
 	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))
 	listen, _ := net.Listen("tcp", ":8081")
 	rpcServer.Serve(listen)
+}
+```
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/0fe343ad58a6696c1cb6607f7e0c6f3f767cf084#diff-91be4e775403e5048a6fb19c931abd2fe591204782b7aab11e3ec104bec5825eL5)
+
+### 03. 创建客户端调用
+
+客户端可以新建一个工程，或者在当前工程下新建 `client` 文件夹表示客户端代码。
+
+在客户端的代码中不需要使用中间 `.proto` 文件，只引用生成的 `.pb.go` 文件。
+
+新建 `main.go` 来完成客户端调用代码
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"gin-grpc/services"
+	"google.golang.org/grpc"
+	"log"
+)
+
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	prodClient := services.NewProdServiceClient(conn)
+	prodRes, err := prodClient.GetProdStock(context.Background(), &services.ProdRequest{ProdId: 12})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(prodRes.ProdStock)
 }
 ```
 
