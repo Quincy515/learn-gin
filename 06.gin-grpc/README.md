@@ -101,13 +101,100 @@ message ProdResponse{
 
 或者在根目录下执行 `protoc --proto_path=pbfile --go_out=services pbfile/Prod.proto` 指定 `proto` 文件的路径。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/a744fd338089e1093db7b8d6bd7369284b2fc89f#diff-91be4e775403e5048a6fb19c931abd2fe591204782b7aab11e3ec104bec5825eR1)
+
+### 02. 创建gRPC服务端并运行
+
+上面做了一个 “中间文件”并生成对应的go文件，现在创建真正的服务。
+
+#### 第1步：修改 `.proto` 文件
+
+```protobuf
+syntax = "proto3";
+package services;
+message  ProdRequest {
+  int32 prod_id = 1;   // 传入的商品ID
+}
+message ProdResponse{
+  int32 prod_stock = 1;// 商品库存
+}
+service ProdService {
+  rpc GetProdStock (ProdRequest) returns (ProdResponse);
+}
+```
+
+#### 第2步：重新生成 `.pb.go` 文件
+
+之前执行的是 `protoc --go_out=../services/ Prod.proto`
+
+现在执行的是 `protoc --go_out=plugins=grpc:../services Prod.proto`
+
+或者在根目录下执行
+
+ `protoc --proto_path=pbfile --go_out=plugins=grpc:services pbfile/Prod.proto`。
+
+会自动覆盖之前生成的 `Prod.pb.go` 文件。
+
+此时生成的文件 `Prod.pb.go` 主要变动是有两个接口
+
+```go
+// ProdServiceClient is the client API for ProdService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+type ProdServiceClient interface {
+	GetProdStock(ctx context.Context, in *ProdRequest, opts ...grpc.CallOption) (*ProdResponse, error)
+}
+...
+// ProdServiceServer is the server API for ProdService service.
+type ProdServiceServer interface {
+	GetProdStock(context.Context, *ProdRequest) (*ProdResponse, error)
+}
+...
+func RegisterProdServiceServer(s *grpc.Server, srv ProdServiceServer) {
+	s.RegisterService(&_ProdService_serviceDesc, srv)
+}
+```
+
+发布服务的时候，就需要新建个 `struct` 来继承这个 `interface{}` 接口，即实现 `GetProdStock(context.Context, *ProdRequest) (*ProdResponse, error)` 方法。
+
+#### 第3步：新建具体的实现类
+
+新建文件 `gin-grpc/services/ProdService.go`
+
+```go
+package services
+
+import "context"
+
+type ProdService struct{}
+
+func (this *ProdService) GetProdStock(ctx context.Context, request *ProdRequest) (*ProdResponse, error) {
+	return &ProdResponse{ProdStock: 20}, nil
+}
+```
+
+#### 第4步：启动服务
+
+新建文件 `gin-grpc/server.go`
+
+```go
+package main
+
+import (
+	"gin-grpc/services"
+	"google.golang.org/grpc"
+	"net"
+)
+
+func main() {
+	rpcServer := grpc.NewServer()
+	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))
+	listen, _ := net.Listen("tcp", ":8081")
+	rpcServer.Serve(listen)
+}
+```
+
 代码变动 [git commit]()
-
-
-
-
-
-
 
 
 
