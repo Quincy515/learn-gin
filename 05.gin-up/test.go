@@ -46,7 +46,7 @@ func (this *calcListener) ExitNumber(ctx *parser.NumberContext) {
 }
 func main() {
 	// 使用 go 原生的模板功能，
-	//tpl := template.New("client").Funcs(map[string]interface{}{
+	//tpl := template.New("test").Funcs(map[string]interface{}{
 	//	"echo": func(params ...interface{}) interface{} {
 	//		return fmt.Sprintf("echo: %v", params[0])
 	//	},

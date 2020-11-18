@@ -8,7 +8,7 @@ func TestComparableExpr_filter(t *testing.T) {
 		this ComparableExpr
 		want string
 	}{
-		// TODO: Add client cases.
+		// TODO: Add test cases.
 		{"w1", ComparableExpr("a>3"), "gt .a 3"},
 		{"w2", ComparableExpr("a==3"), "eq .a 3"},
 		{"w3", ComparableExpr("a>=3"), "ge .a 3"},
@@ -38,7 +38,7 @@ func TestComparableExpr_filter(t *testing.T) {
 //		want    string
 //		wantErr bool
 //	}{
-//		// TODO: Add client cases.
+//		// TODO: Add test cases.
 //	}
 //	for _, tt := range tests {
 //		t.Run(tt.name, func(t *testing.T) {
@@ -63,7 +63,7 @@ func TestIsComparableExpr(t *testing.T) {
 		args args
 		want bool
 	}{
-		// TODO: Add client cases.
+		// TODO: Add test cases.
 		{"w1", args{"a>3"}, true},
 		{"w2", args{"a==3"}, true},
 		{"w3", args{"a>=3"}, true},
@@ -91,7 +91,7 @@ func Test_getCompareToken(t *testing.T) {
 		args args
 		want string
 	}{
-		// TODO: Add client cases.
+		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -111,7 +111,7 @@ func Test_parseToken(t *testing.T) {
 		args args
 		want string
 	}{
-		// TODO: Add client cases.
+		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

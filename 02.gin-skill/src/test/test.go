@@ -7,8 +7,8 @@ import (
 
 func GetInfo(id int) (gin.H, error) {
 	if id > 10 {
-		return gin.H{"message": "client"}, nil
+		return gin.H{"message": "test"}, nil
 	} else {
-		return nil, fmt.Errorf("client error")
+		return nil, fmt.Errorf("test error")
 	}
 }

@@ -930,7 +930,7 @@ func (this *UserClass) UserList(c *gin.Context) goft.Models {
 }
 ...
 func (this *UserClass) Build(goft *goft.Goft) {
-	goft.Handle("GET", "/client", this.UserTest).
+	goft.Handle("GET", "/test", this.UserTest).
 		Handle("GET", "/user", this.UserList).
 		Handle("GET", "/user/detail", this.UserDetail)
 }
@@ -1118,7 +1118,7 @@ type GormAdapter struct {
 }
 
 func NewGormAdapter() *GormAdapter {
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err)
@@ -1581,7 +1581,7 @@ type XormAdapter struct {
 }
 
 func NewXormAdapter() *XormAdapter {
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	engine, err := xorm.NewEngine("mysql", dsn)
 	if err != nil {
 		log.Fatal(err)
@@ -2471,7 +2471,7 @@ func Strong(txt string) template.HTML {
 }
 
 func Test() string {
-	return "client"
+	return "test"
 }
 ```
 
@@ -2585,7 +2585,7 @@ var FuncMap = map[string]interface{}{
 	},
 
 	"Test": func() string {
-		return "client"
+		return "test"
 	},
 }
 ```
@@ -3223,7 +3223,7 @@ import (
 
 func main() {
 	// 使用 go 原生的模板功能，
-	tpl := template.New("client").Funcs(map[string]interface{}{
+	tpl := template.New("test").Funcs(map[string]interface{}{
 		"echo": func(params ...interface{}) interface{} {
 			return fmt.Sprintf("echo: %v", params[0])
 		},
@@ -3430,7 +3430,7 @@ func TestIsComparableExpr(t *testing.T) {
 		args args
 		want bool
 	}{
-		// TODO: Add client cases.
+		// TODO: Add test cases.
 		{"w1", args{"a>3"}, true},
 		{"w2", args{"a==3"}, true},
 		{"w3", args{"a>=3"}, true},
@@ -3459,7 +3459,7 @@ func TestComparableExpr_filter(t *testing.T) {
 		this ComparableExpr
 		want string
 	}{
-		// TODO: Add client cases.
+		// TODO: Add test cases.
 		{"w1", ComparableExpr("a>3"), "gt .a 3"},
 		{"w2", ComparableExpr("a==3"), "eq .a 3"},
 		{"w3", ComparableExpr("a>=3"), "ge .a 3"},

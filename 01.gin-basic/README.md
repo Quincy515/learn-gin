@@ -991,7 +991,7 @@ import (
 
 func main() {
 	// 参考 https://github.com/go-sql-driver/mysql#dsn-data-source-name 获取详情
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	rows, _ := db.Raw("SELECT topic_id, topic_title FROM topics").Rows()
 	for rows.Next() {
@@ -1039,7 +1039,7 @@ import (
 )
 
 func main() {
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	tc := &TopicClass{}
 	db.First(&tc)
@@ -1152,7 +1152,7 @@ import (
 )
 
 func main() {
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	tc := &TopicClass{}
 	db.First(&tc, 2)
@@ -1288,7 +1288,7 @@ func main() {
 
 ```go
 func GetTopicDetail(c *gin.Context) {
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	tid := c.Param("topic_id")
 	topics := Topics{}
@@ -1328,7 +1328,7 @@ var (
 )
 
 func init() {
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		fmt.Println(err)
@@ -1399,7 +1399,7 @@ var (
 )
 
 func init() {
-	dsn := "root:root1234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		fmt.Println(err)
@@ -1573,7 +1573,7 @@ var (
 )
 
 func init() {
-	dsn := "root:root234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		//fmt.Println(err)
@@ -1682,7 +1682,7 @@ var (
 )
 
 func InitDB() {
-	dsn := "root:root234@tcp(127.0.0.1:3306)/client?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
 	DBHelper, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		//fmt.Println(err)

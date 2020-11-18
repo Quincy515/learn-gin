@@ -425,7 +425,7 @@ import (
 )
 
 func main() {
-	creds, err := credentials.NewServerTLSFromFile("keys/client.pem", "keys/client.key")
+	creds, err := credentials.NewServerTLSFromFile("keys/test.pem", "keys/test.key")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -470,7 +470,7 @@ import (
 )
 
 func main() {
-	creds, err := credentials.NewServerTLSFromFile("keys/client.pem", "keys/client.key")
+	creds, err := credentials.NewServerTLSFromFile("keys/test.pem", "keys/test.key")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -489,7 +489,7 @@ func main() {
 		Addr:    ":8081",
 		Handler: mux,
 	}
-	httpServer.ListenAndServeTLS("keys/client.pem", "keys/client.key")
+	httpServer.ListenAndServeTLS("keys/test.pem", "keys/test.key")
 }
 ```
 
