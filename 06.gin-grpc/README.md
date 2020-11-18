@@ -1519,5 +1519,121 @@ message OrderMain{//主订单模型
 
 ![](../imgs/26_grpc_gateway.jpg)
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/c26046a7e8b7cc643479df33f9322fc42f4b83fd#diff-84d5cadaa82f6eeca6dc3d619649d2c2a9176ca7137584962e2235e93101175dL14)
 
+### 15. 穿插知识点：使用第三方库进行字段验证
+
+1. 比如是 `gin` 和 `grpc` ，提交是统一走 `gin web` 框架，可以在 `gin` 中验证。验证通过了调用 `grpc` 方法。
+2. 比如像现在内部是 `grpc` 外部有个网关 `gateway`，在网管部分验证非常麻烦，可以放到  `grpc` ，即实际实现部分，比如 `services/OrdersService.go` 中的 `orderRequest`，可以手动完成，
+
+使用第三方库  https://github.com/envoyproxy/protoc-gen-validate
+
+安装 `go get -u github.com/envoyproxy/protoc-gen-validate`
+
+使用这个插件在生成 `.pb.go` 时就生成了验证规则。
+
+虽然写起来比较麻烦，但是好处是写在 `.proto` 中间文件中，可以自动生成不同语言的验证。
+
+修改订单金额必须大于1。
+
+```protobuf
+syntax = "proto3";
+package services;
+option go_package = ".;services";
+import   "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
+
+message ProdModel {// 商品模型
+  int32 prod_id = 1;
+  string prod_name = 2;
+  float prod_price = 3;
+}
+
+message OrderMain{//主订单模型
+  int32 order_id = 1;//订单ID，数字自增
+  string order_no = 2; //订单号
+  int32 user_id = 3; //购买者ID
+  float order_money = 4 [(validate.rules).float.gt = 1];//商品金额
+  google.protobuf.Timestamp order_time = 5; // 订单时间
+  repeated OrderDetail order_detail = 6; // 嵌套子订单
+}
+
+message OrderDetail{// 子订单模型
+  int32 detail_id = 1;
+  string order_no = 2;
+  int32 prod_id = 3;
+  float prod_price = 4;
+  int32 prod_num = 5;
+}
+```
+
+生成文件 
+
+```bash
+protoc \
+  -I . \
+  -I ${GOPATH}/src \
+  -I ${GOPATH}/src/github.com/protoc-gen-validate \
+  --go_out=plugins=grpc:../services \
+  --validate_out=lang=go:../services \
+  Models.proto
+```
+
+然后可以看到 `services` 目录新生成了 `Models.pb.validate.go` 文件
+
+```go
+// Validate checks the field values on OrderMain with the rules defined in the
+// proto definition for this message. If any rules are violated, an error is returned.
+func (m *OrderMain) Validate() error {
+	if m == nil {
+		return nil
+	}
+
+	// no validation rules for OrderId
+
+	// no validation rules for OrderNo
+
+	// no validation rules for UserId
+
+	if m.GetOrderMoney() <= 1 {
+		return OrderMainValidationError{
+			field:  "OrderMoney",
+			reason: "value must be greater than 1",
+		}
+	}
+  ...
+```
+
+修改代码 `services/OrdersService.go`
+
+```go
+package services
+
+import (
+	"context"
+	"fmt"
+)
+
+type OrderService struct{}
+
+func (this *OrderService) NewOrder(ctx context.Context, orderRequest *OrderRequest) (*OrderResponse, error) {
+	err := orderRequest.OrderMain.Validate()
+	if err != nil {
+		return &OrderResponse{
+			Status:  "error",
+			Message: err.Error(),
+		}, nil
+	}
+	fmt.Println(orderRequest.OrderMain)
+	return &OrderResponse{
+		Status:  "ok",
+		Message: "success",
+	}, nil
+}
+```
+
+运行 `grpc` 服务端和 `gateway httpserver` 网关，发送请求
+
+![](../imgs/27_grpc_gateway.jpg)
+
+代码变动 [git commit]()
