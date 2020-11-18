@@ -1,0 +1,13 @@
+syntax = "proto3";
+package services;
+import "Models.proto";
+option go_package = ".;services";
+
+message OrderResponse {
+  string status = 1;
+  string message = 2;
+}
+
+service OrderService {
+  rpc NewOrder(OrderMain) returns (OrderResponse) {}
+}

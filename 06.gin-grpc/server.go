@@ -9,7 +9,8 @@ import (
 
 func main() {
 	rpcServer := grpc.NewServer(grpc.Creds(helper.GetServerCreds()))
-	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))
+	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))   // 商品服务
+	services.RegisterOrderServiceServer(rpcServer, new(services.OrderService)) // 订单服务
 
 	listen, _ := net.Listen("tcp", ":8081")
 	rpcServer.Serve(listen)

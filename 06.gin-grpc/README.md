@@ -1211,5 +1211,92 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/f787294c152bcc155bd05a2b1c10e9a795539b63#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L17)
+
+### 11. 语法学习(5)日期类型、创建主订单模型(上)
+
+创建主订单模型 `pbfile/Models.go`
+
+```protobuf
+message OrderMain{ //主订单模型
+    int32 order_id=1;//订单ID，数字自增
+    string order_no=2; //订单号
+    int32 user_id=3; //购买者ID
+    float order_money=4;//商品金额 
+   //这里还需要一个订单时间
+}
+```
+
+使用TimeStamp
+
+```protobuf
+import   "google/protobuf/timestamp.proto";
+
+message OrderMain{ //主订单模型
+    int32 order_id=1;//订单ID，数字自增
+    string order_no=2; //订单号
+    int32 user_id=3; //购买者ID
+    float order_money=4;//商品金额
+    google.protobuf.Timestamp order_time=5;
+}
+```
+
+新建文件 `pbfile/Orders.proto` 设定一个方法
+
+```protobuf
+syntax = "proto3";
+package services;
+import "Models.proto";
+option go_package = ".;services";
+
+message OrderResponse {
+  string status = 1;
+  string message = 2;
+}
+
+service OrderService {
+  rpc NewOrder(OrderMain) returns (OrderResponse) {}
+}
+```
+
+生成 `.pb.go` 文件
+
+`protoc --go_out=plugins=grpc:../services Orders.proto`
+`protoc --go_out=plugins=grpc:../services Models.proto`
+
+在 `services/OrdersService.go` 实现
+
+```go
+package services
+
+import (
+	"context"
+	"fmt"
+)
+
+type OrderService struct{}
+
+func (this *OrderService) NewOrder(ctx context.Context, orderMain *OrderMain) (*OrderResponse, error) {
+	fmt.Println(orderMain)
+	return &OrderResponse{
+		Status:  "ok",
+		Message: "success",
+	}, nil
+}
+```
+
+在服务端 rpc 启动服务里注册订单服务
+
+```go
+func main() {
+	rpcServer := grpc.NewServer(grpc.Creds(helper.GetServerCreds()))
+	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))   // 商品服务
+	services.RegisterOrderServiceServer(rpcServer, new(services.OrderService)) // 订单服务
+
+	listen, _ := net.Listen("tcp", ":8081")
+	rpcServer.Serve(listen)
+}
+```
+
 代码变动 [git commit]()
 
