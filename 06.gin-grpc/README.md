@@ -2029,6 +2029,247 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/034ab679fcbd7d59b5ebf3c312660f15cc850108#diff-dc576b33b5093f4c968f2943df65b7a64afda74e81f771e62d310a3c77e525a5L7)
+
+### 19.流模式入门(5)：双向流模式的基本套路
+
+![](../imgs/29_stream.jpg)
+
+场景：  客户端批量查询用户积分
+
+1、客户端分批把用户列表发送过去（**客户端获取列表比较慢**）
+
+2、服务端查询积分**也很慢**,所以分批发送过去
+
+此时应该使用 双向流模式
+
+实际业务中应该使用协程方法进行处理。这里只是简单的实现。
+
+#### 第1步： 修改 `Users.proto`
+
+` rpc GetUserScoreByTWS(stream UserScoreRequest) returns (stream UserScoreResponse);`
+
+```protobuf
+syntax = "proto3";
+package services;
+option go_package = ".;services";
+import "Models.proto";
+
+message UserScoreRequest {
+  repeated UserInfo users = 1;
+}
+
+message UserScoreResponse {
+  repeated UserInfo users = 1;
+}
+
+service UserService {
+  rpc GetUserScore(UserScoreRequest) returns (UserScoreResponse) {}
+  rpc GetUserScoreByServerStream(UserScoreRequest) returns (stream UserScoreResponse) {} // 服务端流 分批处理和发送
+  rpc GetUserScoreByClientStream(stream UserScoreRequest) returns (UserScoreResponse); // 客户端流
+  rpc GetUserScoreByTWS(stream UserScoreRequest) returns (stream UserScoreResponse); // 双向流
+}
+```
+
+#### 第2步：生成 `.pb.go` 
+
+```bash
+ protoc \
+  -I . \
+  -I ${GOPATH}/src \
+  -I ${GOPATH}/src/github.com/protoc-gen-validate \
+  --go_out=plugins=grpc:../services \
+  --validate_out=lang=go:../services \
+  Users.proto
+```
+
+看到 `Users.pb.go` 文件中
+
+```go
+// UserServiceServer is the server API for UserService service.
+type UserServiceServer interface {
+	GetUserScore(context.Context, *UserScoreRequest) (*UserScoreResponse, error)
+	GetUserScoreByServerStream(*UserScoreRequest, UserService_GetUserScoreByServerStreamServer) error
+	GetUserScoreByClientStream(UserService_GetUserScoreByClientStreamServer) error
+	GetUserScoreByTWS(UserService_GetUserScoreByTWSServer) error
+}
+```
+
+#### 第3步：服务端实现
+
+```go
+// GetUserScoreByTWS 双向流
+func (this *UserService) GetUserScoreByTWS(stream UserService_GetUserScoreByTWSServer) error {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF { //接收完了
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		for _, user := range req.Users {
+			user.UserScore = score //这里好比是服务端做的业务处理
+			score++
+			users = append(users, user)
+		}
+		err = stream.Send(&UserScoreResponse{Users: users})
+		if err != nil {
+			fmt.Println(err)
+		}
+		users = (users)[0:0]
+	}
+}
+```
+
+完整的 `services/UserService.go` 代码
+
+```go
+package services
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"time"
+)
+
+type UserService struct{}
+
+// GetUserScore 普通方法一次性返回
+func (*UserService) GetUserScore(ctx context.Context, in *UserScoreRequest) (*UserScoreResponse, error) {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for _, user := range in.Users {
+		user.UserScore = score
+		score++
+		users = append(users, user)
+	}
+	return &UserScoreResponse{Users: users}, nil
+}
+
+// GetUserScoreByServerStream 服务端流
+func (this *UserService) GetUserScoreByServerStream(in *UserScoreRequest, stream UserService_GetUserScoreByServerStreamServer) error {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for index, user := range in.Users {
+		user.UserScore = score
+		score++
+		users = append(users, user)
+
+		if (index+1)%2 == 0 && index > 0 {
+			// 每隔2条发送
+			err := stream.Send(&UserScoreResponse{Users: users})
+			if err != nil {
+				return err
+			}
+			users = (users)[0:0] // 发送完成之后清空切片，方便下次发送
+		}
+		time.Sleep(time.Second * 1) // 模拟这里处理比较耗时
+	}
+	if len(users) > 0 { // 发送剩余残留的数据
+		err := stream.Send(&UserScoreResponse{Users: users})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetUserScoreByClientStream 客户端流
+func (this *UserService) GetUserScoreByClientStream(stream UserService_GetUserScoreByClientStreamServer) error {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF { // 接受结束
+			return stream.SendAndClose(&UserScoreResponse{Users: users}) // 发送并关闭
+		}
+		if err != nil { // 接受出错
+			return err
+		}
+		for _, user := range req.Users {
+			user.UserScore = score // 服务端做的业务处理
+			score++
+			users = append(users, user) // 把处理的结果放入 users
+		}
+	}
+}
+
+// GetUserScoreByTWS 双向流
+func (this *UserService) GetUserScoreByTWS(stream UserService_GetUserScoreByTWSServer) error {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF { //接收完了
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		for _, user := range req.Users {
+			user.UserScore = score //这里好比是服务端做的业务处理
+			score++
+			users = append(users, user)
+		}
+		err = stream.Send(&UserScoreResponse{Users: users})
+		if err != nil {
+			fmt.Println(err)
+		}
+		users = (users)[0:0]
+	}
+}
+```
+
+
+
+#### 第4步：客户端拷贝新生成的 `.pb.go` 文件
+
+#### 第5步： 客户端调用
+
+```go
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(helper.GetClientCreds()))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	ctx := context.Background()
+	userClient := services.NewUserServiceClient(conn)
+	stream, err := userClient.GetUserScoreByTWS(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var uid int32 = 1         // 发3次，每次发 5 条数据
+	for j := 1; j <= 3; j++ { // 模拟客户端发送耗时过程
+		req := services.UserScoreRequest{}
+		req.Users = make([]*services.UserInfo, 0)
+
+		for i := 1; i < 6; i++ { // 假设是一个耗时的过程
+			req.Users = append(req.Users, &services.UserInfo{UserId: uid})
+			uid++
+		}
+		err := stream.Send(&req)
+		if err != nil {
+			log.Println(err)
+		}
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Println(err)
+		}
+		fmt.Println(res.Users)
+	}
+}
+```
+
 代码变动 [git commit]()
 
 

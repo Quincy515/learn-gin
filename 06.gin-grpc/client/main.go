@@ -7,6 +7,7 @@ import (
 	"gin-grpc/services"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"io"
 )
 
 func main() {
@@ -19,29 +20,32 @@ func main() {
 
 	ctx := context.Background()
 	userClient := services.NewUserServiceClient(conn)
-	stream, err := userClient.GetUserScoreByClientStream(ctx)
+	stream, err := userClient.GetUserScoreByTWS(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
+	var uid int32 = 1         // 发3次，每次发 5 条数据
 	for j := 1; j <= 3; j++ { // 模拟客户端发送耗时过程
-		var i int32 // 发3次，每次发 5 条数据
 		req := services.UserScoreRequest{}
 		req.Users = make([]*services.UserInfo, 0)
 
-		for i = 1; i < 6; i++ { // 假设是一个耗时的过程
-			req.Users = append(req.Users, &services.UserInfo{UserId: i})
+		for i := 1; i < 6; i++ { // 假设是一个耗时的过程
+			req.Users = append(req.Users, &services.UserInfo{UserId: uid})
+			uid++
 		}
 		err := stream.Send(&req)
 		if err != nil {
 			log.Println(err)
 		}
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Println(err)
+		}
+		fmt.Println(res.Users)
 	}
-
-	res, err := stream.CloseAndRecv()
-	if err != nil { // 读取失败，就停止程序运行
-		log.Fatal(err)
-	}
-	fmt.Println(res.Users)
 }
 
 //t := timestamp.Timestamp{Seconds: time.Now().Unix()}
