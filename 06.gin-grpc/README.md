@@ -1768,3 +1768,135 @@ func main() {
 
 代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/f93c0214aa936cf7175e7e57a8221db81b296457#diff-84d5cadaa82f6eeca6dc3d619649d2c2a9176ca7137584962e2235e93101175dL25)
 
+### 17. 服务端流模式、场景：分批发送查询结果
+
+上面实现的是由客户端发起用户积分查询，如果有成千上个用户积分查询，
+
+```go
+func (*UserService) GetUserScore(ctx context.Context, in *UserScoreRequest) (*UserScoreResponse, error) {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for _, user := range in.Users {
+		user.UserScore = score
+		score++
+		users = append(users, user)
+	}
+	return &UserScoreResponse{Users: users}, nil
+}
+```
+
+之前是一次性发送 `return &UserScoreResponse{Users: users}, nil`
+
+```go
+syntax = "proto3";
+package services;
+option go_package = ".;services";
+import "Models.proto";
+
+message UserScoreRequest {
+  repeated UserInfo users = 1;
+}
+
+message UserScoreResponse {
+  repeated UserInfo users = 1;
+}
+
+service UserService {
+  rpc GetUserScore(UserScoreRequest) returns (UserScoreResponse) {}
+  rpc GetUserScoreByServerStream(UserScoreRequest) returns (stream UserScoreResponse) {} // 服务端流 分批处理和发送
+}
+```
+
+生成 `.pb.go` 文件
+
+```bash
+protoc \
+  -I . \
+  -I ${GOPATH}/src \
+  -I ${GOPATH}/src/github.com/protoc-gen-validate \
+  --go_out=plugins=grpc:../services \
+  --validate_out=lang=go:../services \
+  Users.proto
+```
+
+```go
+// UserServiceServer is the server API for UserService service.
+type UserServiceServer interface {
+	GetUserScore(context.Context, *UserScoreRequest) (*UserScoreResponse, error)
+	GetUserScoreByServerStream(*UserScoreRequest, UserService_GetUserScoreByServerStreamServer) error
+}
+```
+
+更新服务端 `services/UserService.go`
+
+```go
+// GetUserScoreByServerStream 服务端流
+func (this *UserService) GetUserScoreByServerStream(in *UserScoreRequest, stream UserService_GetUserScoreByServerStreamServer) error {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for index, user := range in.Users {
+		user.UserScore = score
+		score++
+		users = append(users, user)
+
+		if (index+1)%2 == 0 && index > 0 {
+			// 每隔2条发送
+			err := stream.Send(&UserScoreResponse{Users: users})
+			if err != nil {
+				return err
+			}
+			users = (users)[0:0] // 发送完成之后清空切片，方便下次发送
+		}
+		time.Sleep(time.Second * 1) // 模拟这里处理比较耗时
+	}
+	if len(users) > 0 { // 发送剩余残留的数据
+		err := stream.Send(&UserScoreResponse{Users: users})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+```
+
+拷贝新生成的 `Users.pb.go` 到客户端，
+
+```go
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(helper.GetClientCreds()))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	ctx := context.Background()
+	userClient := services.NewUserServiceClient(conn)
+	var i int32
+	req := services.UserScoreRequest{}
+	req.Users = make([]*services.UserInfo, 0)
+
+	for i = 1; i < 20; i++ {
+		req.Users = append(req.Users, &services.UserInfo{UserId: i})
+	}
+	stream, err := userClient.GetUserScoreByServerStream(ctx, &req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break // 读取到结尾就 break
+		}
+		if err != nil { // 读取失败，就停止程序运行
+			log.Fatal(err)
+		}
+		fmt.Println(res.Users)
+	}
+}
+```
+
+服务端流，在客户端可以一边接受，一边开协程处理已经接受的数据。
+
+代码变动 [git commit]()
+

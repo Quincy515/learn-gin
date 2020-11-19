@@ -7,6 +7,7 @@ import (
 	"gin-grpc/services"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"io"
 )
 
 func main() {
@@ -26,8 +27,20 @@ func main() {
 	for i = 1; i < 20; i++ {
 		req.Users = append(req.Users, &services.UserInfo{UserId: i})
 	}
-	res, err := userClient.GetUserScore(ctx, &req)
-	fmt.Println(res.Users)
+	stream, err := userClient.GetUserScoreByServerStream(ctx, &req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break // 读取到结尾就 break
+		}
+		if err != nil { // 读取失败，就停止程序运行
+			log.Fatal(err)
+		}
+		fmt.Println(res.Users)
+	}
 	//t := timestamp.Timestamp{Seconds: time.Now().Unix()}
 	//orderClient := services.NewOrderServiceClient(conn)
 	//res, _ := orderClient.NewOrder(ctx, &services.OrderRequest{
