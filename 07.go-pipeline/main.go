@@ -2,36 +2,48 @@ package main
 
 import "fmt"
 
-type Cmd func(list []int) (ret []int)
+type Cmd func(list []int) chan int
+type PipeCmd func(in chan int) chan int //支持管道的函数
 
-// Evens 寻找偶数
-func Evens(list []int) (ret []int) {
-	ret = make([]int, 0)
-	for _, num := range list {
-		if num%2 == 0 {
-			ret = append(ret, num)
+// Evens 求偶数
+func Evens(list []int) chan int {
+	c := make(chan int)
+	go func() {
+		defer close(c)
+		for _, num := range list {
+			if num%2 == 0 { //业务流程
+				c <- num
+			}
 		}
-	}
-	return
+	}()
+
+	return c
+
 }
 
-// Multiply 乘以 10
-func Multiply(list []int) (ret []int) {
-	ret = make([]int, 0)
-	for _, num := range list {
-		ret = append(ret, num*10)
-	}
-	return
+// M10 乘以10
+func M10(in chan int) chan int { //这个函数是支持管道的
+	out := make(chan int)
+	go func() {
+		defer close(out)
+		for num := range in {
+			out <- num * 10
+		}
+	}()
+	return out
 }
 
-// p 模拟管道函数
-func p(args []int, c1 Cmd, c2 Cmd) []int {
+//管道函数
+func Pipe(args []int, c1 Cmd, c2 PipeCmd) chan int {
 	ret := c1(args)
 	return c2(ret)
 }
 
 func main() {
 	nums := []int{2, 3, 6, 12, 22, 16, 4, 9, 23, 64, 62}
-	//fmt.Println(Multiply(Evens(nums)))
-	fmt.Println(p(nums, Evens, Multiply))
+
+	ret := Pipe(nums, Evens, M10)
+	for r := range ret {
+		fmt.Printf("%d ", r)
+	}
 }
