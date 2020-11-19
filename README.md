@@ -20,7 +20,7 @@ Go 课程
 | 12. Go Web+RabbitMQ实战速学篇 ⭐️        | http://www.jtthink.com/course/110  |                                                              |
 | 13. Go基础进阶之MySQL代理和中间件篇 ⭐️  | http://www.jtthink.com/course/85   |                                                              |
 | 14. Go Etcd实战速学 ⭐️                  | http://www.jtthink.com/course/90   |                                                              |
-| 15. Go Grpc实战速学入门 ⭐️              | http://www.jtthink.com/course/91   |                                                              |
+| 15. Go Grpc实战速学入门 ⭐️              | http://www.jtthink.com/course/91   | [100%](https://github.com/custer-go/learn-gin/tree/main/06.gin-grpc) |
 | 16. Go-Kit微服务入门第一季             | http://www.jtthink.com/course/83   |                                                              |
 | 17. Go-Micro微服务实战入门(第一波)     | http://www.jtthink.com/course/96   |                                                              |
 | 18. Go Git 创建自己的 git 服务         | http://www.jtthink.com/course/102  |                                                              |
