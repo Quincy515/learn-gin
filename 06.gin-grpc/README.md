@@ -1636,4 +1636,135 @@ func (this *OrderService) NewOrder(ctx context.Context, orderRequest *OrderReque
 
 ![](../imgs/27_grpc_gateway.jpg)
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/8357d9be080df5fccf27a04be571ab2e6b1ea463#diff-84d5cadaa82f6eeca6dc3d619649d2c2a9176ca7137584962e2235e93101175dL2)
+
+### 16. 流模式入门(上)、场景：批量查询用户积分
+
+为何要用流模式
+
+前面的例子，仅仅是传输比较小的数据， 基本模式是客户端请求----服务端响应
+
+如果是传输较大数据呢？会带来
+
+1、数据包过大导致压力陡增
+
+2、需要等待客户端包全部发送，才能处理以及响应
+
+举例
+
+假设我要从库里取 一批(x万到几十万)。批量查询用户的积分
+
+先创建用户模型 `pbfiles/Models.go`
+
+```protobuf
+ message UserInfo{
+  int32 user_id=1;
+  int32 user_score=2;
+}
+```
+
+创建Users.proto
+
+```protobuf
+syntax="proto3";
+package services;
+option go_package = ".;services";
+import "Models.proto";
+message UserScoreRequest{
+    repeated UserInfo users=1;
+}
+message UserScoreResponse{
+    repeated UserInfo users=1;
+}
+service UserService{
+    rpc GetUserScore(UserScoreRequest) returns (UserScoreResponse);
+}
+```
+
+生成部分
+
+```bash
+protoc --go_out=plugins=grpc:../services   Users.proto
+
+protoc  --grpc-gateway_out=logtostderr=true:../services Users.proto
+```
+
+编写 `UserService`
+
+```go
+package services
+
+import "context"
+
+type UserService struct{}
+
+func (*UserService) GetUserScore(ctx context.Context, in *UserScoreRequest) (*UserScoreResponse, error) {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for _, user := range in.Users {
+		user.UserScore = score
+		score++
+		users = append(users, user)
+	}
+	return &UserScoreResponse{Users: users}, nil
+}
+```
+
+`grpc` 无服务端注册用户积分服务
+
+```go
+package main
+
+import (
+	"gin-grpc/helper"
+	"gin-grpc/services"
+	"google.golang.org/grpc"
+	"net"
+)
+
+func main() {
+	rpcServer := grpc.NewServer(grpc.Creds(helper.GetServerCreds()))
+	services.RegisterProdServiceServer(rpcServer, new(services.ProdService))   // 商品服务
+	services.RegisterOrderServiceServer(rpcServer, new(services.OrderService)) // 订单服务
+	services.RegisterUserServiceServer(rpcServer, new(services.UserService)) // 用户服务
+
+	listen, _ := net.Listen("tcp", ":8081")
+	rpcServer.Serve(listen)
+}
+```
+
+客户端调用
+
+```go
+func main() {
+	conn, err := grpc.Dial(":8081", grpc.WithTransportCredentials(helper.GetClientCreds()))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	ctx := context.Background()
+	userClient := services.NewUserServiceClient(conn)
+	var i int32
+	req := services.UserScoreRequest{}
+	req.Users = make([]*services.UserInfo, 0)
+
+	for i = 1; i < 20; i++ {
+		req.Users = append(req.Users, &services.UserInfo{UserId: i})
+	}
+	res, err := userClient.GetUserScore(ctx, &req)
+	fmt.Println(res.Users)
+}
+```
+
+先运行服务端，再运行客户端，可以看到控制台
+
+```bash
+[user_id:1  user_score:101 user_id:2  user_score:102 user_id:3  user_score:103 user_id:4  user_score:104 user_id:5  user_score:105 user_id:6  user_score:106 user_id:7  user_score:107 user_id:8  user_score:108 user_id:9  user_score:109 user_id:10  user_score:110 user_id:11  user_score:111 user_id:12  user_score:112 user_id:13  user_score:113 user_id:14  user_score:114 user_id:15  user_score:115 user_id:16  user_score:116 user_id:17  user_score:117 user_id:18  user_score:118 user_id:19  user_score:119]
+```
+
+如果同时查询成千上万个，返回的速度会很慢，如果6个6个的查询。
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/f93c0214aa936cf7175e7e57a8221db81b296457#diff-84d5cadaa82f6eeca6dc3d619649d2c2a9176ca7137584962e2235e93101175dL25)
+
