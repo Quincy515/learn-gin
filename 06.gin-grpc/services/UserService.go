@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -45,4 +46,24 @@ func (this *UserService) GetUserScoreByServerStream(in *UserScoreRequest, stream
 		}
 	}
 	return nil
+}
+
+// GetUserScoreByClientStream 客户端流
+func (this *UserService) GetUserScoreByClientStream(stream UserService_GetUserScoreByClientStreamServer) error {
+	var score int32 = 101
+	users := make([]*UserInfo, 0)
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF { // 接受结束
+			return stream.SendAndClose(&UserScoreResponse{Users: users}) // 发送并关闭
+		}
+		if err != nil { // 接受出错
+			return err
+		}
+		for _, user := range req.Users {
+			user.UserScore = score // 服务端做的业务处理
+			score++
+			users = append(users, user) // 把处理的结果放入 users
+		}
+	}
 }
