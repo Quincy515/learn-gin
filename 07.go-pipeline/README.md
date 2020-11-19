@@ -166,3 +166,9 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/2949e84ca7cadf3cbc73fac5a0f0954c9c311f95#diff-e695b9090228290d541dcaaff7ccf49dc68debd598c1f2520f8d03afe27f98f7L2)
+
+### 03. 管道模式性能对比，可变参数
+
+代码变动 [git commit]()
+

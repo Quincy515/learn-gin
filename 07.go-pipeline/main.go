@@ -1,49 +1,25 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"pipeline/v1"
+	"pipeline/v2"
+	"time"
+)
 
-type Cmd func(list []int) chan int
-type PipeCmd func(in chan int) chan int //支持管道的函数
-
-// Evens 求偶数
-func Evens(list []int) chan int {
-	c := make(chan int)
-	go func() {
-		defer close(c)
-		for _, num := range list {
-			if num%2 == 0 { //业务流程
-				c <- num
-			}
-		}
-	}()
-
-	return c
-
-}
-
-// M10 乘以10
-func M10(in chan int) chan int { //这个函数是支持管道的
-	out := make(chan int)
-	go func() {
-		defer close(out)
-		for num := range in {
-			out <- num * 10
-		}
-	}()
-	return out
-}
-
-//管道函数
-func Pipe(args []int, c1 Cmd, c2 PipeCmd) chan int {
-	ret := c1(args)
-	return c2(ret)
+func test(v string) {
+	nums := []int{2, 3, 6, 12, 22, 16, 4, 9, 23, 64, 62}
+	start := time.Now().Unix()
+	if v == "v1" {
+		v1.Test(nums)
+	} else {
+		v2.Test(nums)
+	}
+	end := time.Now().Unix()
+	fmt.Printf("%s测试--用时:%d秒\r\n", v, end-start)
 }
 
 func main() {
-	nums := []int{2, 3, 6, 12, 22, 16, 4, 9, 23, 64, 62}
-
-	ret := Pipe(nums, Evens, M10)
-	for r := range ret {
-		fmt.Printf("%d ", r)
-	}
+	test("v1") //
+	test("v2") //
 }
