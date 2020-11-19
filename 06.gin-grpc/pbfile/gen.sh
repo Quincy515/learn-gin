@@ -6,9 +6,23 @@ protoc \
   -I ${GOPATH}/src/github.com/protoc-gen-validate \
   --go_out=plugins=grpc:../services \
   --validate_out=lang=go:../services \
+  Users.proto
+
+protoc \
+  -I . \
+  -I ${GOPATH}/src \
+  -I ${GOPATH}/src/github.com/protoc-gen-validate \
+  --go_out=plugins=grpc:../services \
+  --validate_out=lang=go:../services \
   Models.proto
 
 protoc --grpc-gateway_out=logtostderr=true:../services Prod.proto
 protoc --grpc-gateway_out=logtostderr=true:../services Orders.proto
-
+protoc \
+  -I . \
+  -I ${GOPATH}/src \
+  -I ${GOPATH}/src/github.com/protoc-gen-validate \
+  --grpc-gateway_out=logtostderr=true:../services \
+  --validate_out=lang=go:../services \
+  Users.proto
 

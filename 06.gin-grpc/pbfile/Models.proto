@@ -26,3 +26,8 @@ message OrderDetail{// 子订单模型
   float prod_price = 4;
   int32 prod_num = 5;
 }
+
+message UserInfo {// 用户积分模型
+  int32 user_id = 1;
+  int32 user_score = 2;
+}
