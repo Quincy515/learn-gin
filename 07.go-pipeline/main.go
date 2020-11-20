@@ -20,6 +20,6 @@ func test(v string) {
 }
 
 func main() {
-	test("v1") //
+	//test("v1") //
 	test("v2") //
 }

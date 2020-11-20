@@ -2,6 +2,7 @@ package v2
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -15,7 +16,7 @@ func Evens(list []int) chan int {
 		defer close(c)
 		for _, num := range list {
 			if num%2 == 0 { //业务流程
-				time.Sleep(time.Second * 1)
+				//time.Sleep(time.Second * 1)
 				c <- num
 			}
 		}
@@ -49,7 +50,7 @@ func M10(in chan int) chan int { //这个函数是支持管道的
 	return out
 }
 
-//管道函数
+// Pipe 管道函数
 func Pipe(args []int, c1 Cmd, cs ...PipeCmd) chan int {
 	ret := c1(args)
 	if len(cs) == 0 {
@@ -67,8 +68,30 @@ func Pipe(args []int, c1 Cmd, cs ...PipeCmd) chan int {
 	return retlist[len(retlist)-1]
 }
 
+// Pipe2 多了复用
+func Pipe2(args []int, c1 Cmd, cs ...PipeCmd) chan int {
+	ret := c1(args)
+	out := make(chan int)
+	wg := sync.WaitGroup{}
+	for _, c := range cs {
+		getChan := c(ret)
+		wg.Add(1)
+		go func(input chan int) {
+			defer wg.Done()
+			for v := range input {
+				out <- v
+			}
+		}(getChan)
+	}
+	go func() {
+		defer close(out)
+		wg.Wait()
+	}()
+	return out
+}
+
 func Test(nums []int) {
-	ret := Pipe(nums, Evens, M10, M10, M10, M10)
+	ret := Pipe2(nums, Evens, M10, M10)
 	for r := range ret {
 		fmt.Printf("%d ", r)
 	}
