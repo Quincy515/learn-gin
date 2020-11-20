@@ -640,4 +640,175 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/f1cd7935e5fd4d0d50d05c66d563f2fc96e14f1e#diff-e7900fc44e9a2eed8b1239df19aa97ca20eace8e20a1122c7498d6a76b1176efL3)
+
+### 07. 一个相对通用的管道工具类封装
+
+先封装了一个 `Pipe` 类
+
+```go
+package getdata
+
+import "sync"
+
+type InChan chan interface{}                  // InChan 管道入参
+type OutChan chan interface{}                 // OutChan 管道数据输出
+type CmdFunc func(args ...interface{}) InChan // CmdFunc 读取数据源的普通方法类型
+type PipeCmdFunc func(in InChan) OutChan      // PipeCmdFunc 管道方法的类型
+type Pipe struct {                            // Pipe 管道的定义
+	Cmd     CmdFunc
+	PipeCmd PipeCmdFunc
+	Count   int
+}
+
+func NewPipe() *Pipe {
+	return &Pipe{Count: 1}
+}
+
+// SetCmd 设置普通取数据方法
+func (this *Pipe) SetCmd(c CmdFunc) {
+	this.Cmd = c
+}
+
+// SetPipeCmd 设置管道的执行方法
+func (this *Pipe) SetPipeCmd(c PipeCmdFunc, count int) {
+	this.PipeCmd = c
+	this.Count = count
+}
+
+// Exec 管道的实现
+func (this *Pipe) Exec(args ...interface{}) OutChan {
+	in := this.Cmd(args)
+	out := make(OutChan)
+	wg := sync.WaitGroup{}
+	for i := 0; i < this.Count; i++ {
+		getChan := this.PipeCmd(in)
+		wg.Add(1)
+		go func(input OutChan) {
+			defer wg.Done()
+			for v := range input {
+				out <- v
+			}
+		}(getChan)
+	}
+	go func() {
+		defer close(out)
+		wg.Wait()
+	}()
+	return out
+}
+```
+
+修改了 `getdata.go`
+
+```go
+package getdata
+
+import "fmt"
+
+type Book struct {
+	BookId   int    `gorm:"column:book_id"`
+	BookName string `gorm:"column:book_name"`
+}
+
+func (this *Book) String() string {
+	return fmt.Sprintf("bookid:%d,book_name:%s\n", this.BookId, this.BookName)
+}
+
+type BookList struct {
+	Data []*Book
+	Page int
+}
+
+// Result 管道结果集
+type Result struct {
+	Page int
+	Err  error
+}
+```
+
+测试函数
+
+```go
+package getdata
+
+import (
+	"fmt"
+	"pipeline/AppInit"
+	"time"
+
+	"log"
+)
+
+const sql = "select * from books order by book_id limit ? offset ?"
+
+// GetPage 获取页码
+func GetPage(args ...interface{}) InChan {
+	in := make(InChan)
+	go func() {
+		defer close(in)
+		for i := 1; i <= 80; i++ { // 第 1 页到 80 页
+			in <- i
+		}
+	}()
+	return in
+}
+
+// GetData 取数据源的普通方法
+func GetData(in InChan) OutChan {
+	out := make(OutChan)
+	go func() {
+		defer close(out)
+		for d := range in {
+			page := d.(int)
+			pagesize := 1000
+			booklist := &BookList{make([]*Book, 0), page}
+			db := AppInit.GetDB().Raw(sql, pagesize, (page-1)*pagesize).Find(&booklist.Data)
+			if db.Error != nil {
+				log.Println(db.Error)
+			}
+			out <- booklist.Data
+		}
+	}()
+	return out
+}
+
+// DoData 模拟处理数据，必须写成管道函数
+func DoData(in InChan) OutChan {
+	out := make(OutChan)
+	go func() {
+		defer close(out)
+		for d := range in {
+			v := d.([]*Book)
+			time.Sleep(time.Second * 1)
+			out <- fmt.Sprintf("处理了%d条数据,%d\n", len(v), time.Now().Unix())
+		}
+	}()
+	return out
+}
+func PipeTest() {
+	p1 := NewPipe()           // 新建一个管道
+	p1.SetCmd(GetPage)        // 获取原始数据
+	p1.SetPipeCmd(GetData, 5) // 5 表示多路复用
+	out := p1.Exec()          // 执行管道
+
+	//for item := range out {
+	//	v := item.([]*Book)
+	//	fmt.Println(v)
+	//}
+
+	p2 := NewPipe()
+	p2.SetCmd(func(args ...interface{}) InChan {
+		return InChan(out)
+	})
+	p2.SetPipeCmd(DoData, 2)
+	out2 := p2.Exec()
+
+	for item := range out2 {
+		fmt.Println(item)
+	}
+}
+```
+
 代码变动 [git commit]()
+

@@ -21,10 +21,10 @@ func test(v string) {
 }
 
 func testData() {
-	start := time.Now().Unix()
-	getdata.Test()
-	end := time.Now().Unix()
-	fmt.Printf("测试--用时:%d秒\r\n", end-start)
+	start := time.Now().UnixNano() / 1e6
+	getdata.PipeTest()
+	end := time.Now().UnixNano() / 1e6
+	fmt.Printf("测试--用时:%d毫秒\r\n", end-start)
 }
 
 func main() {
