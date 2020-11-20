@@ -26,7 +26,7 @@ Go 课程
 | 18. Go Git 创建自己的 git 服务         | http://www.jtthink.com/course/102  |                                                              |
 | 19. Go Gin模块化改造和工具开发 ⭐️       | http://www.jtthink.com/course/105  |                                                              |
 | 20. Go-Micro微服务实战视频教育网站 ⭐️⭐️  | http://www.jtthink.com/course/116  |                                                              |
-| 21. Go高并发模型之管道模式 ⭐️           | http://www.jtthink.com/course/119  |                                                              |
+| 21. Go高并发模型之管道模式 ⭐️           | http://www.jtthink.com/course/119  | [100%](https://github.com/custer-go/learn-gin/tree/main/07.go-pipeline) |
 | 22. Go IoC容器初级版 ⭐️                 | https://www.jtthink.com/course/128 |                                                              |
 | 23. Go Redis 脚手架 ⭐️                  | https://www.jtthink.com/course/130 |                                                              |
 | 24. Go Casbin 权限实战速学 ⭐️           | https://www.jtthink.com/course/132 | [100%](https://github.com/custer-go/learn-gin/tree/main/03.gin-casbin) |
