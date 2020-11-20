@@ -502,5 +502,142 @@ func main() {
 
 执行查看控制台 `测试--用时:2秒`
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/5c73fdf523f364f88b425ace8e716f0a82fc2b4a#diff-e7900fc44e9a2eed8b1239df19aa97ca20eace8e20a1122c7498d6a76b1176efR1)
 
+### 06. 场景演练：从mysql导出到csv(下)-管道模式改造
+
+<img src="../imgs/30_pipeline.jpg" style="zoom:90%;" />
+
+#### 第1步：管道定义
+
+1、管道入参(也就是管道连接点) `type InChan chan *BookList`
+
+ 2、结果集
+
+```go
+// Result 管道结果集，也就是 OutChan
+type Result struct {
+	Page int
+	Err  error
+}
+```
+
+3、管道数据输出  `type OutChan chan *Result`
+
+#### 第2步：定义管道命令类型
+
+`DataCmd` 读取数据源的方法类型 `type DataCmd func() InChan`
+
+`DataPipeCmd` 管道方法的类型 `type DataPipeCmd func(in InChan) OutChan`
+
+原读取数据源函数
+
+```go
+func ReadData() {
+	page := 1
+	pageSize := 1000
+	for {
+		bookList := &BookList{make([]*Book, 0), page}
+		db := AppInit.GetDB().Raw(sql, pageSize, (page-1)*pageSize).Find(&bookList.Data)
+		if db.Error != nil || db.RowsAffected == 0 {
+			break
+		}
+		err := SaveData(bookList)
+		if err != nil {
+			log.Println(err)
+		}
+		page++
+	}
+}
+```
+
+修改读取数据源的方法，以返回 `InChan` 
+
+```go
+func ReadData() InChan {
+	page := 1
+	pageSize := 1000
+	in := make(InChan)
+	go func() {
+		defer close(in)
+		for {
+			bookList := &BookList{make([]*Book, 0), page}
+			db := AppInit.GetDB().Raw(sql, pageSize, (page-1)*pageSize).Find(&bookList.Data)
+			if db.Error != nil || db.RowsAffected == 0 {
+				break
+			}
+			in <- bookList
+			page++
+		}
+	}()
+	return in
+}
+```
+
+#### 第3步：管道函数
+
+```go
+func Pipe(c1 DataCmd, cs ...DataPipeCmd) OutChan {
+	in := c1()
+	out := make(OutChan)
+	wg := sync.WaitGroup{}
+	for _, c := range cs {
+		getChan := c(in)
+		wg.Add(1)
+		go func(input OutChan) {
+			defer wg.Done()
+			for v := range input {
+				out <- v
+			}
+		}(getChan)
+	}
+	go func() {
+		defer close(out)
+		wg.Wait()
+	}()
+	return out
+}
+```
+
+#### 第4步：执行函数
+
+```go
+// WriteData 执行管道的函数
+func WriteData(in InChan) OutChan {
+	out := make(OutChan)
+	go func() {
+		defer close(out)
+		for d := range in {
+			err := SaveData(d)
+			out <- &Result{Page: d.Page, Err: err}
+		}
+	}()
+	return out
+}
+```
+
+添加测试函数
+
+```go
+func Test() {
+	out := Pipe(ReadData, WriteData, WriteData, WriteData, WriteData, WriteData)
+	for o := range out {
+		fmt.Printf("%d.csv文件执行完成,结果:%v\n", o.Page, o.Err)
+	}
+}
+```
+
+```go
+func testData() {
+	start := time.Now().Unix()
+	getdata.Test()
+	end := time.Now().Unix()
+	fmt.Printf("测试--用时:%d秒\r\n", end-start)
+}
+
+func main() {
+	testData()
+}
+```
+
+代码变动 [git commit]()

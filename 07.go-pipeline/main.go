@@ -22,7 +22,7 @@ func test(v string) {
 
 func testData() {
 	start := time.Now().Unix()
-	getdata.ReadData()
+	getdata.Test()
 	end := time.Now().Unix()
 	fmt.Printf("测试--用时:%d秒\r\n", end-start)
 }
