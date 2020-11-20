@@ -289,4 +289,218 @@ func Pipe2(args []int, c1 Cmd, cs ...PipeCmd) chan int {
 }
 ```
 
- 代码变动 [git commit]()
+ 代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e6bbbf3c561ef06da7bff8d8bc7144b54075231f#diff-e695b9090228290d541dcaaff7ccf49dc68debd598c1f2520f8d03afe27f98f7L20)
+
+### 05. 场景演练：从mysql导出到csv(上)
+
+使用 `data.sql` 文件导入到数据库，创建 `csv` 文件夹。
+
+需求：把book表全部取出出来
+
+1、导入到文本文件中
+
+2、每1000条 一个文件
+
+首先初始化数据库 `AppInit/DBInit.go`
+
+```go
+package AppInit
+
+import (
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"log"
+	"time"
+)
+
+var db *gorm.DB
+
+func init() {
+	var err error
+	dsn := "root:root1234@tcp(localhost:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	// 获取通用数据库对象 sql.DB ，然后使用其提供的功能
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// SetMaxIdleConns 用于设置连接池中空闲连接的最大数量。
+	sqlDB.SetMaxIdleConns(10)
+	// SetMaxOpenConns 设置打开数据库连接的最大数量。
+	sqlDB.SetMaxOpenConns(100)
+	// SetConnMaxLifetime 设置了连接可复用的最大时间。
+	sqlDB.SetConnMaxLifetime(time.Hour)
+}
+
+func GetDB() *gorm.DB {
+	return db
+}
+```
+
+获取数据 `SELECT * FROM books ORDER BY book_id` 
+
+分批取数据 `SELECT * FROM books ORDER BY book_id LIMIT ? OFFSET ?`
+
+首先建立数据对象
+
+```go
+type Book struct {
+	BookId   int    `gorm:"column:book_id"`
+	BookName string `gorm:"column:book_name"`
+}
+
+type BookList struct {
+	Data []*Book
+	Page int
+}
+```
+
+实现读取数据库的方法
+
+```go
+const sql = "SELECT * FROM books ORDER BY book_id LIMIT ? OFFSET ?"
+
+func ReadData() {
+	page := 1
+	pageSize := 1000
+	for {
+		bookList := &BookList{make([]*Book, 0), page}
+		db := AppInit.GetDB().Raw(sql, pageSize, (page-1)*pageSize).Find(&bookList.Data)
+		if db.Error != nil || db.RowsAffected == 0 {
+			break
+		}
+		err := SaveData(bookList)
+		if err != nil {
+			log.Println(err)
+		}
+		page++
+	}
+}
+```
+
+写入 CSV 文件方法
+
+```go
+// SaveData 写入到 csv 文件
+func SaveData(data *BookList) error {
+	file := fmt.Sprintf("./csv/%d.csv", data.Page)
+	csvFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
+	defer csvFile.Close()
+	w := csv.NewWriter(csvFile) // 创建一个新的写入文件流
+	header := []string{"book_id", "book_name"}
+	export := [][]string{
+		header,
+	}
+	for _, d := range data.Data {
+		cnt := []string{
+			strconv.Itoa(d.BookId),
+			d.BookName,
+		}
+		export = append(export, cnt)
+	}
+	err = w.WriteAll(export)
+	if err != nil {
+		return err
+	}
+	w.Flush()
+	return nil
+}
+```
+
+获取数据 `getdata/getdata.go` 的完整代码
+
+```go
+package getdata
+
+import (
+	"encoding/csv"
+	"fmt"
+	"log"
+	"os"
+	"pipeline/AppInit"
+	"strconv"
+)
+
+type Book struct {
+	BookId   int    `gorm:"column:book_id"`
+	BookName string `gorm:"column:book_name"`
+}
+
+type BookList struct {
+	Data []*Book
+	Page int
+}
+
+const sql = "SELECT * FROM books ORDER BY book_id LIMIT ? OFFSET ?"
+
+func ReadData() {
+	page := 1
+	pageSize := 1000
+	for {
+		bookList := &BookList{make([]*Book, 0), page}
+		db := AppInit.GetDB().Raw(sql, pageSize, (page-1)*pageSize).Find(&bookList.Data)
+		if db.Error != nil || db.RowsAffected == 0 {
+			break
+		}
+		err := SaveData(bookList)
+		if err != nil {
+			log.Println(err)
+		}
+		page++
+	}
+}
+
+// SaveData 写入到 csv 文件
+func SaveData(data *BookList) error {
+	file := fmt.Sprintf("./csv/%d.csv", data.Page)
+	csvFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
+	defer csvFile.Close()
+	w := csv.NewWriter(csvFile) // 创建一个新的写入文件流
+	header := []string{"book_id", "book_name"}
+	export := [][]string{
+		header,
+	}
+	for _, d := range data.Data {
+		cnt := []string{
+			strconv.Itoa(d.BookId),
+			d.BookName,
+		}
+		export = append(export, cnt)
+	}
+	err = w.WriteAll(export)
+	if err != nil {
+		return err
+	}
+	w.Flush()
+	return nil
+}
+```
+
+测试代码
+
+```go
+func testData() {
+	start := time.Now().Unix()
+	getdata.ReadData()
+	end := time.Now().Unix()
+	fmt.Printf("测试--用时:%d秒\r\n", end-start)
+}
+
+func main() {
+	testData()
+}
+```
+
+执行查看控制台 `测试--用时:2秒`
+
+代码变动 [git commit]()
+

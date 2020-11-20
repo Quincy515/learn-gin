@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"pipeline/getdata"
 	"pipeline/v1"
 	"pipeline/v2"
 	"time"
@@ -19,7 +20,13 @@ func test(v string) {
 	fmt.Printf("%s测试--用时:%d秒\r\n", v, end-start)
 }
 
+func testData() {
+	start := time.Now().Unix()
+	getdata.ReadData()
+	end := time.Now().Unix()
+	fmt.Printf("测试--用时:%d秒\r\n", end-start)
+}
+
 func main() {
-	//test("v1") //
-	test("v2") //
+	testData()
 }
