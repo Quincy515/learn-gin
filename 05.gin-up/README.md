@@ -4280,7 +4280,193 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/05a87f076f0187804ca3a371546544bfd2af1618#diff-cdba2b79ccb5cc80acce878be517d69fde9d35b9a71947f0a56fc28584766bc0R1)
+
+### 34. 脚手架工具开发:cobra的快速使用(1)
+
+#### Cobra
+
+提供了简单的接口来创建命令行程序: https://github.com/spf13/cobra
+
+文档地址：https://github.com/spf13/cobra/blob/master/cobra/README.md
+
+```installing
+go get -u github.com/spf13/cobra/cobra
+```
+
+新建一个纯净的工具项目
+
+```bash
+├── main.go
+├── go.mod
+└── src
+    ├── Annotation
+    └── Annotation.g4
+```
+
+#### 创建基本应用
+
+`cobra init src --pkg-name tool/src`
+
+会在 `src` 目录下，生成一个 `cmd` 文件夹，默认包含了 `root.go`
+
+它帮我们默认设置一个命令叫做 `rootCmd`
+
+```bash
+cobra init src --pkg-name tool/src
+Your Cobra application is ready at
+05.gin-up/tool/src
+```
+
+删除 `cmd` 目录下自动生成的 `main.go` ，在根目录下新建 `main.go` 文件
+
+```go
+package main
+
+import "tool/src/cmd"
+
+func main() {
+	cmd.Execute()
+}
+```
+
+修改 `src/cmd/root.go` 文件
+
+```go
+/*
+Copyright © 2020 NAME HERE <EMAIL ADDRESS>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+package cmd
+
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+	"os"
+
+	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/viper"
+)
+
+var cfgFile string
+var cfgVersion bool
+
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   "src",
+	Short: "A brief description of your application",
+	Long: `A longer description that spans multiple lines and likely contains
+examples and usage of using your application. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	// Uncomment the following line if your bare application
+	// has an action associated with it:
+	Run: func(cmd *cobra.Command, args []string) {
+		if cfgVersion {
+			fmt.Println("version is 0.1")
+		}
+	},
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func init() {
+	cobra.OnInitialize(initConfig)
+
+	// Here you will define your flags and configuration settings.
+	// Cobra supports persistent flags, which, if defined here,
+	// will be global for your application.
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.src.yaml)")
+	rootCmd.PersistentFlags().BoolVarP(&cfgVersion, "version", "V", false, "show tool version")
+
+	// Cobra also supports local flags, which will only run
+	// when this action is called directly.
+	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+// initConfig reads in config file and ENV variables if set.
+func initConfig() {
+	if cfgFile != "" {
+		// Use config file from the flag.
+		viper.SetConfigFile(cfgFile)
+	} else {
+		// Find home directory.
+		home, err := homedir.Dir()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// Search config in home directory with name ".src" (without extension).
+		viper.AddConfigPath(home)
+		viper.SetConfigName(".src")
+	}
+
+	viper.AutomaticEnv() // read in environment variables that match
+
+	// If a config file is found, read it in.
+	if err := viper.ReadInConfig(); err == nil {
+		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	}
+}
+```
+
+执行 `go run main.go --help`
+
+```bash
+go run main.go --help
+A longer description that spans multiple lines and likely contains
+examples and usage of using your application. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.
+
+Usage:
+  src [flags]
+
+Flags:
+      --config string   config file (default is $HOME/.src.yaml)
+  -h, --help            help for src
+  -V, --version         show tool version
+```
+
+运行
+
+```bash
+go run main.go // 没有输出
+go run main.go --version
+version is 0.1
+```
+
 代码变动 [git commit]()
+
+
+
+
+
+
 
 
 
