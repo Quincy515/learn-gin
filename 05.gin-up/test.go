@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"gin-up/BeanExpr/FuncExpr"
 	parser "gin-up/test"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"log"
 	"strconv"
 )
 
@@ -44,7 +46,43 @@ func (this *calcListener) ExitNumber(ctx *parser.NumberContext) {
 	num, _ := strconv.Atoi(ctx.GetText())
 	this.nums = append(this.nums, num)
 }
+
+type FuncExprListener struct {
+	*FuncExpr.BaseBeanExprListener
+	funcName string
+}
+
+// ExitFuncCall is called when production FuncCall is exited.
+func (this *FuncExprListener) ExitFuncCall(ctx *FuncExpr.FuncCallContext) {
+	log.Println("函数名是: ", ctx.GetStart().GetText())
+	this.funcName = ctx.GetStart().GetText()
+}
+
+func (this *FuncExprListener) Run() {
+	if f, ok := FuncMap[this.funcName]; ok {
+		f()
+	}
+}
+
+var FuncMap map[string]func()
+
 func main() {
+	FuncMap = map[string]func(){
+		"test": func() {
+			log.Println("this is test")
+		},
+	}
+
+	is := antlr.NewInputStream("test()")
+	lexer := FuncExpr.NewBeanExprLexer(is)
+	ts := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	p := FuncExpr.NewBeanExprParser(ts)
+	lis := &FuncExprListener{}
+	antlr.ParseTreeWalkerDefault.Walk(lis, p.Start())
+	lis.Run()
+}
+
+func main2() {
 	// 使用 go 原生的模板功能，
 	//tpl := template.New("test").Funcs(map[string]interface{}{
 	//	"echo": func(params ...interface{}) interface{} {

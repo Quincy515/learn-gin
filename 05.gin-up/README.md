@@ -3785,3 +3785,99 @@ func main() {
 
 后面实现基于脚手架的工具 代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/af7b07d9bd994326a408fc5fbf56b234d25f4887#diff-67dac4d9e81202d43bea15cdac298590a85a46df7f68d9fa7cfefae9f38d176fL4)
 
+### 30. 函数表达式(1):规则文件、无参数执行
+
+创建新文件夹 `BeanExpr` 存放规则文件 `BeanExpr.g4`
+
+```g4
+grammar BeanExpr;
+
+// Rules
+start : functionCall EOF;
+
+functionCall
+    : FuncName '(' functionArgs? ')'  #FuncCall   // 函数调用  譬如 GetAge()  或 GetUser(101)
+    ;
+
+functionArgs
+            : Args (',' Args)* #FuncArgs // 带一个，为分隔符的序列，* 表示0个多多个
+            ;
+// fragment标识的规则只能为其它词法规则提供基础
+fragment DIGIT: [0-9];
+
+// 以下是Token
+// 字符串 参数 用单引号  如 'abc' 也可以是 '\'abc\'' 支持单引号转义
+StringArg: '\'' ('\\'. | '\'\'' | ~('\'' | '\\'))* '\'';
+FuncName: [a-zA-Z][a-zA-Z0-9]*; // 函数名称 必须字母开头, 支持数字字母的组合
+Dot: '.';
+Args: '-'?Number | StringArg;  // 参数目前先支持 字符串或 数字, - 表示负号
+Int: [1-9]DIGIT*; // 正整数
+Number :Int? '.' DIGIT+   // 如 19.02  .02
+       | [1-9]DIGIT*  // 如 22 5
+       ;
+WHITESPACE: [ \r\n\t]+ -> skip;
+```
+
+右击选择 `Configure ANTLR...`
+
+![](../imgs/31_BeanExpr.jpg)
+
+设置参数
+
+![](../imgs/32_antlr_configure.jpg)
+
+然后右击选择 `Generate ANTLR Recognizer`
+
+在目录 `BeanExpr` 目录下会自动生成新的文件夹 `FuncExpr`，
+
+接下来就可以在 `test.go` 中调用。
+
+```go
+type FuncExprListener struct {
+	*FuncExpr.BaseBeanExprListener
+	funcName string
+}
+
+// ExitFuncCall is called when production FuncCall is exited.
+func (this *FuncExprListener) ExitFuncCall(ctx *FuncExpr.FuncCallContext) {
+	log.Println("函数名是: ", ctx.GetStart().GetText())
+	this.funcName = ctx.GetStart().GetText()
+}
+
+func (this *FuncExprListener) Run() {
+	if f, ok := FuncMap[this.funcName]; ok {
+		f()
+	}
+}
+
+var FuncMap map[string]func()
+
+func main() {
+	FuncMap = map[string]func(){
+		"test": func() {
+			log.Println("this is test")
+		},
+	}
+
+	is := antlr.NewInputStream("test()")
+	lexer := FuncExpr.NewBeanExprLexer(is)
+	ts := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	p := FuncExpr.NewBeanExprParser(ts)
+	lis := &FuncExprListener{}
+	antlr.ParseTreeWalkerDefault.Walk(lis, p.Start())
+	lis.Run()
+}
+```
+
+执行可以看到 
+
+```bash
+go run test.go
+2020/12/04 10:45:41 函数名是:  test
+2020/12/04 10:45:41 this is test
+```
+
+代码变动 [git commit]()
+
+
+
