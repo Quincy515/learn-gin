@@ -4731,7 +4731,7 @@ func init() {
 
 也可以得到生成的控制器。
 
-代码变量 [git commit]()
+代码变量 [git commit](https://github.com/custer-go/learn-gin/commit/fc7ff8e752e26f35f55406f60246c4576ec562d5#diff-c37fe46eb7bcc8a76d8a4b39bbb3da09e9e987ec9e59250b295d1ee541c78eabL18)
 
 
 
