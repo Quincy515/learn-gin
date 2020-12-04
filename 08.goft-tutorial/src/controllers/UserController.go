@@ -5,9 +5,12 @@ import (
 	"goft-tutorial/pkg/goft"
 	"goft-tutorial/src/middlewares"
 	"goft-tutorial/src/models"
+	"gorm.io/gorm"
 )
 
-type UserController struct{}
+type UserController struct {
+	Db *gorm.DB `inject:"-"` // 依赖注入 - 表示单例模式
+}
 
 func NewUserController() *UserController {
 	return &UserController{}
@@ -23,5 +26,8 @@ func (this *UserController) Build(goft *goft.Goft) {
 
 func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
 	req, _ := ctx.Get("_req")
-	return gin.H{"result": models.NewUserModel(req.(*models.UserDetailRequest).UserId, "testUserName")}
+	uid := req.(*models.UserDetailRequest).UserId
+	user := &models.UserModel{}
+	goft.Error(this.Db.Table("users").Where("user_id=?", uid).Find(user).Error)
+	return user
 }

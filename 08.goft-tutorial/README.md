@@ -481,4 +481,123 @@ func (this *UserController) Build(goft *goft.Goft) {
 
 但是参数处理，和业务处理已经通过路由级中间件分离开来。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/caa8cb0a29fd3407387a7dc7681568749db5d256#diff-fe3b020a336c7e0ea80e1ee4f700c33695d0a78c695d938e5b309e99e559e621L3)
+
+### 07. 依赖注入和ORM 使用 (Gorm)
+
+关于依赖注入，`goft` 使用的就是这个
+
+**手撸IoC容器(golang)初级版本 **http://b.jtthink.com/read.php?tid=573&fid=2 
+
+课程地址 https://www.jtthink.com/course/128
+
+代码地址 https://github.com/shenyisyn/goft-ioc
+
+连接字符串 --- 常规写法
+
+新建文件夹 `src/configure/DBConfig.go`
+
+```go
+package configure
+
+import (
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
+	"log"
+	"os"
+	"time"
+)
+
+type DBConfig struct{}
+
+func NewDBConfig() *DBConfig {
+	return &DBConfig{}
+}
+
+func (this *DBConfig) GormDB() *gorm.DB {
+	newLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+		logger.Config{
+			LogLevel: logger.Info, // Log level
+			Colorful: true,        // 彩色打印
+		},
+	)
+	dsn := "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: newLogger,
+		NamingStrategy: schema.NamingStrategy{
+			TablePrefix:   "t_", // 表名前缀，`User` 的表名应该是 `t_users`
+			SingularTable: true, // 使用单数表名，启用该选项，此时，`User` 的表名应该是 `t_user`
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	mysqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	mysqlDB.SetMaxIdleConns(5)                   //最大空闲数
+	mysqlDB.SetMaxOpenConns(10)                  //最大打开连接数
+	mysqlDB.SetConnMaxLifetime(time.Second * 30) //空闲连接生命周期
+	return db
+}
+```
+
+修改 `main.go` 增加数据库连接的配置
+
+```go
+func main() {
+	goft.Ignite().
+		Config(configure.NewDBConfig()).
+		Attach(middlewares.NewTokenCheck(), middlewares.NewAddVersion()).
+		Mount("v1", controllers.NewIndexController(),
+			controllers.NewUserController()).
+		Launch()
+}
+```
+
+修改`src/controller/UserController.go` 实现从数据库查询用户信息
+
+```go
+package controllers
+
+import (
+	"github.com/gin-gonic/gin"
+	"goft-tutorial/pkg/goft"
+	"goft-tutorial/src/middlewares"
+	"goft-tutorial/src/models"
+	"gorm.io/gorm"
+)
+
+type UserController struct {
+	Db *gorm.DB `inject:"-"` // 依赖注入 - 表示单例模式
+}
+
+func NewUserController() *UserController {
+	return &UserController{}
+}
+
+func (this *UserController) Name() string {
+	return "UserController"
+}
+
+func (this *UserController) Build(goft *goft.Goft) {
+	goft.HandleWithFairing("GET", "/user/:uid", this.UserDetail, middlewares.NewUserMiddleware())
+}
+
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
+	req, _ := ctx.Get("_req")
+	uid := req.(*models.UserDetailRequest).UserId
+	user := &models.UserModel{}
+	goft.Error(this.Db.Table("users").Where("user_id=?", uid).Find(user).Error)
+	return user
+}
+```
+
+访问 http://localhost:8080/v1/user/2?token=1 可以看到 `{"UserId":2,"UserName":"lisi"}`
+
 代码变动 [git commit]()
+
