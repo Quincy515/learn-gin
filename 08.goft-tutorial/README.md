@@ -178,3 +178,63 @@ func main() {
 访问页面 http://localhost:8080/v1/?token=123 可以看到正确的返回 `{"result":"index"}`
 
 使用 `goft.Throw()` 自定义返回的 `status code` 可以看到页面返回 503
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/d7f1b95a28eee5674aa94a264c86182767950d9f#diff-5e031c8fe909e21e054d942a61a9503aad9eed28cc4d7bd5718110d4a74cd23eL3)
+
+### 03. 中间件的使用(2)：修改响应内容
+
+为了让返回的字段添加 `version`，可以使用 `OnResponse`，为了熟练使用中间件，
+
+这里新建一个中间件 `src/middlewares/AddVersion.go`
+
+```go
+package middlewares
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+type AddVersion struct{}
+
+func NewAddVersion() *AddVersion {
+	return &AddVersion{}
+}
+
+func (this *AddVersion) OnRequest(ctx *gin.Context) error {
+	return nil
+}
+
+func (this *AddVersion) OnResponse(result interface{}) (interface{}, error) {
+	return result, nil
+}
+```
+
+修改逻辑
+
+```go
+func (this *AddVersion) OnResponse(result interface{}) (interface{}, error) {
+	if m, ok := result.(gin.H); ok {
+		m["version"] = "0.4.1"
+		return m, nil
+	}
+	return result, nil
+}
+```
+
+在主函数 `main.go` 中增加中间件
+
+```go
+func main() {
+	goft.Ignite().
+		Attach(middlewares.NewTokenCheck(), middlewares.NewAddVersion()).
+		Mount("v1", controllers.NewIndexController()).
+		Launch()
+}
+```
+
+访问 http://localhost:8080/v1/?token=123 可以看到通过中间件的方式**修改响应结果**
+
+`{"result":"index","version":"0.4.1"}`
+
+代码变动 [git commit]()
+
