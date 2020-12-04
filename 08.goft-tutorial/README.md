@@ -320,4 +320,111 @@ func (this *IndexController) Build(goft *goft.Goft) {
 
 `{"metadata":"index test","result":"index test","version":"0.4.1"}`
 
-代码修改 [git commit]()
+代码修改 [git commit](https://github.com/custer-go/learn-gin/commit/8afdfce9d0ff57b6bb1393aa5e94b24c412be330#diff-18266a8616923f74411b54b15f0eb4eb72e8d9c6bfba34c4efeaf75aaa711d36L3)
+
+### 05. 路由级的中间件(2):参数验证和业务分离（上）
+
+场景 `GET /user/123` 得到用户 `ID = 123` 的用户信息。
+
+新建一个用户控制器 `src/controllers/UserController.go`
+
+```go
+package controllers
+
+import (
+	"github.com/gin-gonic/gin"
+	"goft-tutorial/pkg/goft"
+)
+
+type UserController struct{}
+
+func NewUserController() *UserController {
+	return &UserController{}
+}
+
+func (this *UserController) Name() string {
+	return "UserController"
+}
+
+func (this *UserController) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/user/:uid", this.UserDetail)
+}
+
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
+}
+```
+
+新增用户的模型 `src/models/UserModel.go`
+
+```go
+package models
+
+type UserModel struct {
+	UserId   int
+	UserName string
+}
+```
+
+一般是在 `func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {` 控制器中写参数验证。
+
+相对正规的验证方法是先写请求实体，使用 `gin` 原生验证
+
+```go
+package models
+
+// UserDetailRequest 用户请求实体 使用 gin 原生请求验证
+type UserDetailRequest struct {
+	UserId int `binding:"required,gt=0" uri:"uid"`
+}
+
+func NewUserDetailRequest() *UserDetailRequest {
+	return &UserDetailRequest{}
+}
+
+type UserModel struct {
+	UserId   int
+	UserName string
+}
+
+func NewUserModel(userId int, userName string) *UserModel {
+	return &UserModel{UserId: userId, UserName: userName}
+}
+```
+
+然后写业务逻辑
+
+```go
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
+	req := models.NewUserDetailRequest()
+	goft.Error(ctx.BindUri(req)) // 出错就自动抛出异常，没有错误就继续执行
+	return gin.H{"result": models.NewUserModel(req.UserId, "testUserName")}
+}
+```
+
+把控制器增加到 `main.go` 中
+
+```go
+func main() {
+	goft.Ignite().
+		Attach(middlewares.NewTokenCheck(), middlewares.NewAddVersion()).
+		Mount("v1", controllers.NewIndexController(),
+			controllers.NewUserController()).
+		Launch()
+}
+```
+
+访问 http://localhost:8080/v1/user/123?token=1 可以看到结果
+
+```json
+{
+  "result": {
+    "UserId": 123,
+    "UserName": "testUserName"
+	},
+	"version": "0.4.1"
+}
+```
+
+下面分离代码在控制器中仅仅处理业务，验证部分代码可以专门封装到中间件中，一旦以后参数验证规则发生改变，就不需要更改 `controller` 代码，只需要修改中间件或者替换中间件。
+
+代码变动 [git commit]()

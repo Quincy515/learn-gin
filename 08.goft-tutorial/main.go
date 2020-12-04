@@ -9,6 +9,7 @@ import (
 func main() {
 	goft.Ignite().
 		Attach(middlewares.NewTokenCheck(), middlewares.NewAddVersion()).
-		Mount("v1", controllers.NewIndexController()).
+		Mount("v1", controllers.NewIndexController(),
+			controllers.NewUserController()).
 		Launch()
 }
