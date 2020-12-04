@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	Helper "tool/src/helper"
+	"tool/src/resource"
 
 	"github.com/spf13/cobra"
 )
@@ -29,7 +30,7 @@ var controllerCmd = &cobra.Command{
 	Long:  `生成控制器.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// 根据模板生成控制器
-		Helper.GenFile(string(Helper.ReadFile("src/templates/controller.tpl")),
+		Helper.GenFile(Helper.UnGzip(resource.CONTROLLER_TPL),
 			fmt.Sprintf("/src/classes/%sClass.go", Helper.Ucfirst(args[0])),
 			map[string]interface{}{
 				"ControllerName": args[0],

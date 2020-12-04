@@ -4580,7 +4580,162 @@ func init() {
 
 否则使用的时候需要读取 `ReadFile("src/templates/controller.tpl")`。
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e0ab6fd9b1517085a22b81e197aef6b30faccc23#diff-c37fe46eb7bcc8a76d8a4b39bbb3da09e9e987ec9e59250b295d1ee541c78eabR1)
+
+### 36. 脚手架工具开发:生成控制器命令(下)
+
+上面读取模板，并生成控制器，如果编译成可执行的二进制文件，就没有 `controller.tpl` 。
+
+原理是把模板文件读取出来压缩后放入 `src/resource/static.go` 中。
+
+文件 `src/resouce/resource.tpl`
+
+```tpl
+package resource
+
+var (
+  {{range $k,$v:=. }}
+        {{$k}}=`{{Gzip $v}}`
+   {{end}}
+)
+```
+
+文件 `src/resouce/static.go`
+
+```go
+package resource
+
+var (
+  
+)
+```
+
+增加一个命令 `resource`
+
+自动创建控制器命令 `goft resource` (程序内部使用，给别人使用可以删除)
+
+做的事情是：
+
+1、自动读取 `src/template` 目录下所有 `tpl` 文件
+
+2、`Gzip` 压缩
+
+3、存入变量
+
+执行 `cd src && cobra add resource`
+
+修改 `src/cmd/resouce.go` 文件
+
+```go
+package cmd
+
+import (
+	"github.com/spf13/cobra"
+	"goft-tool/src/helper"
+	"io/ioutil"
+	"log"
+	"os"
+	"text/template"
+)
+
+// resourceCmd represents the resource command
+var resourceCmd = &cobra.Command{
+	Use:   "resource",
+	Short: "自动生成模板变量",
+	Long: `自动生成模板变量`,
+	Run: func(cmd *cobra.Command, args []string) {
+		//遍历文件
+		res := Helper.LoadResource("src/templates") //加载 资源文件
+		tpl, err := ioutil.ReadFile(Helper.GetWorkDir() + "/src/resource/resource.tpl")
+		if err != nil {
+			log.Fatal("resource.tpl error",err)
+		}
+		if res != nil {
+			tmpl, err := template.New("resource").Funcs(Helper.NewTplFunction()).Parse(string(tpl))
+			if err != nil {
+				log.Fatal("resource parse error:", err)
+			}
+			file, err := os.OpenFile(Helper.GetWorkDir()+"/src/resource/static.go", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+			if err != nil {
+				log.Fatal("load resource  error:", err)
+			}
+			err = tmpl.Execute(file, res)
+			if err != nil {
+				log.Fatal("create resource  error:", err)
+			}
+			log.Println("资源文件刷新成功")
+		}
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(resourceCmd)
+}
+```
+
+回到根目录执行 
+
+```bash
+go run main.go resource           
+2020/12/04 14:41:31 资源文件刷新成功
+```
+
+此时 `src/resource/static.go` 文件会自动增加变量
+
+```go
+package resource
+
+var (    CONTROLLER_TPL=`H4sIAAAAAAAA/4SSz27UMBDGzxsp7zCyKLJX21i9rrRCtJRyoRdacXYSJ/GS2JHtiFYhRyQuII5wB7UnhITEhedZ/rwFGne1/xDaXGLNfPPNL5/TiuyFKCVktXBOujhSTWusBxpHAAAjUipfdWmSmYaXSh+WRqsMT2QlMLZJlOH4XhVrU64FSh92LXc246Up/LKOz2arMbms3bLJ4qjv750g07lo5HRGW6u0L4AcuANHIDkx2ltT19JiH0iQEgav4DIrlHV+GOLIX7cSNn2GAZy3XeahB85/vrtZvPm++Hi7eP/2183XOBqNAMaImJwZ2zzMReulBVR+u128/oxF+PPjw+8vn+JoiKOi0xmcy5fbGyiD8c7OPo5GVvrOari/3eqHlRP1lXK7owz6fudbh+GR9ELVNPNXMC6VDn155RkE9KeYI27k3KTz6ewu1yRw/mMVxJQFdZg+tdZYtE6eVaar82Ol80urqEnnDGUbIuRNLkRaS0quTWfB41mLRhKWPK+klZSofPaATI6OWPJY6Ty43E2zdSQmne8LAY47VecUl68uqPCsX3M/ETpHkLPTCzIhPPC0wld8qnIyCaj/TZLtXY8HyvDfUboM1wlLeLKtJcHqbwAAAP//ap94qVQDAAA=`  
+)
+```
+
+这样就可以使用生成的变量。替换之前写死的读取模板路径。
+
+修改 `src/cmd/controller.go`
+
+```go
+package cmd
+
+import (
+	"fmt"
+	Helper "tool/src/helper"
+	"tool/src/resource"
+
+	"github.com/spf13/cobra"
+)
+
+// controllerCmd represents the controller command
+var controllerCmd = &cobra.Command{
+	Use:   "controller",
+	Short: "控制器",
+	Long:  `生成控制器.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// 根据模板生成控制器
+		Helper.GenFile(Helper.UnGzip(resource.CONTROLLER_TPL),
+			fmt.Sprintf("/src/classes/%sClass.go", Helper.Ucfirst(args[0])),
+			map[string]interface{}{
+				"ControllerName": args[0],
+			},
+		)
+		fmt.Println("控制器生成成功")
+	},
+	Args: cobra.MinimumNArgs(1), // 至少有一个参数
+}
+
+func init() {
+	newCmd.AddCommand(controllerCmd)
+}
+```
+
+在执行 `go run main.go new controller user`，使用生成出来的模板变量。
+
+也可以得到生成的控制器。
+
+代码变量 [git commit]()
+
+
+
+
 
 
 
