@@ -16,31 +16,36 @@ var _ = strconv.Itoa
 
 
 var parserATN = []uint16{
-	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 12, 27, 4, 
-	2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 3, 2, 3, 2, 3, 2, 3, 3, 3, 3, 3, 3, 5, 
-	3, 15, 10, 3, 3, 3, 3, 3, 3, 4, 3, 4, 3, 4, 7, 4, 22, 10, 4, 12, 4, 14, 
-	4, 25, 11, 4, 3, 4, 2, 2, 5, 2, 4, 6, 2, 3, 3, 2, 6, 8, 2, 25, 2, 8, 3, 
-	2, 2, 2, 4, 11, 3, 2, 2, 2, 6, 18, 3, 2, 2, 2, 8, 9, 5, 4, 3, 2, 9, 10, 
-	7, 2, 2, 3, 10, 3, 3, 2, 2, 2, 11, 12, 7, 9, 2, 2, 12, 14, 7, 3, 2, 2, 
-	13, 15, 5, 6, 4, 2, 14, 13, 3, 2, 2, 2, 14, 15, 3, 2, 2, 2, 15, 16, 3, 
-	2, 2, 2, 16, 17, 7, 4, 2, 2, 17, 5, 3, 2, 2, 2, 18, 23, 9, 2, 2, 2, 19, 
-	20, 7, 5, 2, 2, 20, 22, 9, 2, 2, 2, 21, 19, 3, 2, 2, 2, 22, 25, 3, 2, 2, 
-	2, 23, 21, 3, 2, 2, 2, 23, 24, 3, 2, 2, 2, 24, 7, 3, 2, 2, 2, 25, 23, 3, 
-	2, 2, 2, 4, 14, 23,
+	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 13, 39, 4, 
+	2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 4, 5, 9, 5, 3, 2, 3, 2, 3, 2, 3, 2, 5, 
+	2, 15, 10, 2, 3, 3, 3, 3, 3, 3, 5, 3, 20, 10, 3, 3, 3, 3, 3, 3, 4, 3, 4, 
+	3, 4, 5, 4, 27, 10, 4, 3, 4, 3, 4, 3, 5, 3, 5, 3, 5, 7, 5, 34, 10, 5, 12, 
+	5, 14, 5, 37, 11, 5, 3, 5, 2, 2, 6, 2, 4, 6, 8, 2, 3, 3, 2, 6, 8, 2, 38, 
+	2, 14, 3, 2, 2, 2, 4, 16, 3, 2, 2, 2, 6, 23, 3, 2, 2, 2, 8, 30, 3, 2, 2, 
+	2, 10, 15, 5, 6, 4, 2, 11, 12, 5, 4, 3, 2, 12, 13, 7, 2, 2, 3, 13, 15, 
+	3, 2, 2, 2, 14, 10, 3, 2, 2, 2, 14, 11, 3, 2, 2, 2, 15, 3, 3, 2, 2, 2, 
+	16, 17, 7, 10, 2, 2, 17, 19, 7, 3, 2, 2, 18, 20, 5, 8, 5, 2, 19, 18, 3, 
+	2, 2, 2, 19, 20, 3, 2, 2, 2, 20, 21, 3, 2, 2, 2, 21, 22, 7, 4, 2, 2, 22, 
+	5, 3, 2, 2, 2, 23, 24, 7, 9, 2, 2, 24, 26, 7, 3, 2, 2, 25, 27, 5, 8, 5, 
+	2, 26, 25, 3, 2, 2, 2, 26, 27, 3, 2, 2, 2, 27, 28, 3, 2, 2, 2, 28, 29, 
+	7, 4, 2, 2, 29, 7, 3, 2, 2, 2, 30, 35, 9, 2, 2, 2, 31, 32, 7, 5, 2, 2, 
+	32, 34, 9, 2, 2, 2, 33, 31, 3, 2, 2, 2, 34, 37, 3, 2, 2, 2, 35, 33, 3, 
+	2, 2, 2, 35, 36, 3, 2, 2, 2, 36, 9, 3, 2, 2, 2, 37, 35, 3, 2, 2, 2, 6, 
+	14, 19, 26, 35,
 }
 var deserializer = antlr.NewATNDeserializer(nil)
 var deserializedATN = deserializer.DeserializeFromUInt16(parserATN)
 
 var literalNames = []string{
-	"", "'('", "')'", "','", "", "", "", "", "'.'",
+	"", "'('", "')'", "','", "", "", "", "", "", "'.'",
 }
 var symbolicNames = []string{
-	"", "", "", "", "StringArg", "FloatArg", "IntArg", "FuncName", "Dot", "Float", 
-	"WHITESPACE",
+	"", "", "", "", "StringArg", "FloatArg", "IntArg", "FuncName", "MethodName", 
+	"Dot", "Float", "WHITESPACE",
 }
 
 var ruleNames = []string{
-	"start", "functionCall", "functionArgs",
+	"start", "methodCall", "functionCall", "functionArgs",
 }
 var decisionToDFA = make([]*antlr.DFA, len(deserializedATN.DecisionToState))
 
@@ -78,16 +83,18 @@ const (
 	BeanExprParserFloatArg = 5
 	BeanExprParserIntArg = 6
 	BeanExprParserFuncName = 7
-	BeanExprParserDot = 8
-	BeanExprParserFloat = 9
-	BeanExprParserWHITESPACE = 10
+	BeanExprParserMethodName = 8
+	BeanExprParserDot = 9
+	BeanExprParserFloat = 10
+	BeanExprParserWHITESPACE = 11
 )
 
 // BeanExprParser rules.
 const (
 	BeanExprParserRULE_start = 0
-	BeanExprParserRULE_functionCall = 1
-	BeanExprParserRULE_functionArgs = 2
+	BeanExprParserRULE_methodCall = 1
+	BeanExprParserRULE_functionCall = 2
+	BeanExprParserRULE_functionArgs = 3
 )
 
 // IStartContext is an interface to support dynamic dispatch.
@@ -138,6 +145,16 @@ func (s *StartContext) FunctionCall() IFunctionCallContext {
 	return t.(IFunctionCallContext)
 }
 
+func (s *StartContext) MethodCall() IMethodCallContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMethodCallContext)(nil)).Elem(), 0)
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IMethodCallContext)
+}
+
 func (s *StartContext) EOF() antlr.TerminalNode {
 	return s.GetToken(BeanExprParserEOF, 0)
 }
@@ -186,14 +203,162 @@ func (p *BeanExprParser) Start() (localctx IStartContext) {
 		}
 	}()
 
+	p.SetState(12)
+	p.GetErrorHandler().Sync(p)
+
+	switch p.GetTokenStream().LA(1) {
+	case BeanExprParserFuncName:
+		p.EnterOuterAlt(localctx, 1)
+		{
+			p.SetState(8)
+			p.FunctionCall()
+		}
+
+
+	case BeanExprParserMethodName:
+		p.EnterOuterAlt(localctx, 2)
+		{
+			p.SetState(9)
+			p.MethodCall()
+		}
+		{
+			p.SetState(10)
+			p.Match(BeanExprParserEOF)
+		}
+
+
+
+	default:
+		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+	}
+
+
+	return localctx
+}
+
+
+// IMethodCallContext is an interface to support dynamic dispatch.
+type IMethodCallContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// IsMethodCallContext differentiates from other interfaces.
+	IsMethodCallContext()
+}
+
+type MethodCallContext struct {
+	*antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyMethodCallContext() *MethodCallContext {
+	var p = new(MethodCallContext)
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	p.RuleIndex = BeanExprParserRULE_methodCall
+	return p
+}
+
+func (*MethodCallContext) IsMethodCallContext() {}
+
+func NewMethodCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MethodCallContext {
+	var p = new(MethodCallContext)
+
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = BeanExprParserRULE_methodCall
+
+	return p
+}
+
+func (s *MethodCallContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *MethodCallContext) MethodName() antlr.TerminalNode {
+	return s.GetToken(BeanExprParserMethodName, 0)
+}
+
+func (s *MethodCallContext) FunctionArgs() IFunctionArgsContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFunctionArgsContext)(nil)).Elem(), 0)
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IFunctionArgsContext)
+}
+
+func (s *MethodCallContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *MethodCallContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+
+func (s *MethodCallContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(BeanExprListener); ok {
+		listenerT.EnterMethodCall(s)
+	}
+}
+
+func (s *MethodCallContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(BeanExprListener); ok {
+		listenerT.ExitMethodCall(s)
+	}
+}
+
+
+
+
+func (p *BeanExprParser) MethodCall() (localctx IMethodCallContext) {
+	localctx = NewMethodCallContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 2, BeanExprParserRULE_methodCall)
+	var _la int
+
+
+	defer func() {
+		p.ExitRule()
+	}()
+
+	defer func() {
+		if err := recover(); err != nil {
+			if v, ok := err.(antlr.RecognitionException); ok {
+				localctx.SetException(v)
+				p.GetErrorHandler().ReportError(p, v)
+				p.GetErrorHandler().Recover(p, v)
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(6)
-		p.FunctionCall()
+		p.SetState(14)
+		p.Match(BeanExprParserMethodName)
 	}
 	{
-		p.SetState(7)
-		p.Match(BeanExprParserEOF)
+		p.SetState(15)
+		p.Match(BeanExprParserT__0)
+	}
+	p.SetState(17)
+	p.GetErrorHandler().Sync(p)
+	_la = p.GetTokenStream().LA(1)
+
+
+	if (((_la) & -(0x1f+1)) == 0 && ((1 << uint(_la)) & ((1 << BeanExprParserStringArg) | (1 << BeanExprParserFloatArg) | (1 << BeanExprParserIntArg))) != 0) {
+		{
+			p.SetState(16)
+			p.FunctionArgs()
+		}
+
+	}
+	{
+		p.SetState(19)
+		p.Match(BeanExprParserT__1)
 	}
 
 
@@ -304,7 +469,7 @@ func (s *FuncCallContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *BeanExprParser) FunctionCall() (localctx IFunctionCallContext) {
 	localctx = NewFunctionCallContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 2, BeanExprParserRULE_functionCall)
+	p.EnterRule(localctx, 4, BeanExprParserRULE_functionCall)
 	var _la int
 
 
@@ -327,27 +492,27 @@ func (p *BeanExprParser) FunctionCall() (localctx IFunctionCallContext) {
 	localctx = NewFuncCallContext(p, localctx)
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(9)
+		p.SetState(21)
 		p.Match(BeanExprParserFuncName)
 	}
 	{
-		p.SetState(10)
+		p.SetState(22)
 		p.Match(BeanExprParserT__0)
 	}
-	p.SetState(12)
+	p.SetState(24)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 
 	if (((_la) & -(0x1f+1)) == 0 && ((1 << uint(_la)) & ((1 << BeanExprParserStringArg) | (1 << BeanExprParserFloatArg) | (1 << BeanExprParserIntArg))) != 0) {
 		{
-			p.SetState(11)
+			p.SetState(23)
 			p.FunctionArgs()
 		}
 
 	}
 	{
-		p.SetState(14)
+		p.SetState(26)
 		p.Match(BeanExprParserT__1)
 	}
 
@@ -469,7 +634,7 @@ func (s *FuncArgsContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *BeanExprParser) FunctionArgs() (localctx IFunctionArgsContext) {
 	localctx = NewFunctionArgsContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 4, BeanExprParserRULE_functionArgs)
+	p.EnterRule(localctx, 6, BeanExprParserRULE_functionArgs)
 	var _la int
 
 
@@ -492,7 +657,7 @@ func (p *BeanExprParser) FunctionArgs() (localctx IFunctionArgsContext) {
 	localctx = NewFuncArgsContext(p, localctx)
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(16)
+		p.SetState(28)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((((_la) & -(0x1f+1)) == 0 && ((1 << uint(_la)) & ((1 << BeanExprParserStringArg) | (1 << BeanExprParserFloatArg) | (1 << BeanExprParserIntArg))) != 0)) {
@@ -502,18 +667,18 @@ func (p *BeanExprParser) FunctionArgs() (localctx IFunctionArgsContext) {
 			p.Consume()
 		}
 	}
-	p.SetState(21)
+	p.SetState(33)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 
 	for _la == BeanExprParserT__2 {
 		{
-			p.SetState(17)
+			p.SetState(29)
 			p.Match(BeanExprParserT__2)
 		}
 		{
-			p.SetState(18)
+			p.SetState(30)
 			_la = p.GetTokenStream().LA(1)
 
 			if !((((_la) & -(0x1f+1)) == 0 && ((1 << uint(_la)) & ((1 << BeanExprParserStringArg) | (1 << BeanExprParserFloatArg) | (1 << BeanExprParserIntArg))) != 0)) {
@@ -525,7 +690,7 @@ func (p *BeanExprParser) FunctionArgs() (localctx IFunctionArgsContext) {
 		}
 
 
-		p.SetState(23)
+		p.SetState(35)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}

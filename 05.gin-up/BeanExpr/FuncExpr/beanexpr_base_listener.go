@@ -26,6 +26,12 @@ func (s *BaseBeanExprListener) EnterStart(ctx *StartContext) {}
 // ExitStart is called when production start is exited.
 func (s *BaseBeanExprListener) ExitStart(ctx *StartContext) {}
 
+// EnterMethodCall is called when production methodCall is entered.
+func (s *BaseBeanExprListener) EnterMethodCall(ctx *MethodCallContext) {}
+
+// ExitMethodCall is called when production methodCall is exited.
+func (s *BaseBeanExprListener) ExitMethodCall(ctx *MethodCallContext) {}
+
 // EnterFuncCall is called when production FuncCall is entered.
 func (s *BaseBeanExprListener) EnterFuncCall(ctx *FuncCallContext) {}
 

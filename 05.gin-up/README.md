@@ -3877,7 +3877,7 @@ go run test.go
 2020/12/04 10:45:41 this is test
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/ab8cd8012073b371dbea36a70f299ccce1180f86#diff-f1886be6e1b1800fd3b19f973cb53ee4fa44c7ea156f997e4886749e4a672997R1)
 
 ### 31. 函数表达式(2):带参数执行表达式
 
@@ -4061,7 +4061,84 @@ go run test.go
 2020/12/04 11:07:17 this is  custer  and age is:  16
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/09ef411ba74b9a257f2fe7e404b51ff5965fdc39#diff-67dac4d9e81202d43bea15cdac298590a85a46df7f68d9fa7cfefae9f38d176fL6)
+
+### 32. 类方法表达式执行(1):规则定义讲解
+
+上面实现的是函数表达式的执行，譬如 字符串如下 : `test('custer',16)`
+
+那么就会在函数库中寻找函数名为 `test` 的函数，执行并传入参数的解析。
+
+下面要做到的是类方法如下 `User.Show('custer',19)`
+
+规则书写 
+
+```g4
+grammar BeanExpr;
+
+// Rules
+start : functionCall | methodCall EOF;
+
+methodCall
+    : MethodName '(' functionArgs? ')'
+    ;
+
+functionCall
+    : FuncName '(' functionArgs? ')'  #FuncCall   //函数调用  譬如 GetAge()  或 GetUser(101)
+    ;
+
+//参数目前先支持 字符串或 数字
+functionArgs
+            : (FloatArg | StringArg | IntArg) (',' (FloatArg | StringArg | IntArg))* #FuncArgs //带一个，为分隔符的序列
+            ;
+//fragment标识的规则只能为其它词法规则提供基础
+fragment DIGIT: [0-9];
+
+//以下是Token
+//字符串 参数 用单引号  如 'abc' 也可以是 '\'abc\'' 支持单引号转义
+StringArg: '\'' ('\\'. | '\'\'' | ~('\'' | '\\'))* '\'';
+FloatArg: '-'?Float;
+IntArg: '-'?DIGIT+;
+FuncName: [a-zA-Z][a-zA-Z0-9]*; //函数名称 必须字母开头, 支持数字字母的组合
+MethodName: FuncName (Dot FuncName)+; // user.age.abc.bcd
+Dot: '.';
+
+Float :(DIGIT+)? '.' DIGIT+   // 如 19.02  .02   目前不支持科学计数
+       ;
+WHITESPACE: [ \r\n\t]+ -> skip;
+```
+
+在 `test.go` 中增加 
+
+```go
+// ExitMethodCall is called when production methodCall is exited.
+func (this *FuncExprListener) ExitMethodCall(ctx *FuncExpr.MethodCallContext) {
+	log.Println("method 内容是： ", ctx.GetText())
+}
+```
+
+调用 `MethodCall` 
+
+```go
+is := antlr.NewInputStream("User.test('custer',16)")
+```
+
+查看前后执行的对比
+
+```bash
+go run test.go
+2020/12/04 12:46:59 函数名是:  test
+2020/12/04 12:46:59 this is  custer  and age is:  16
+go run test.go
+2020/12/04 12:47:43 method 内容是：  User.test('custer',16)
+
+```
+
 代码变动 [git commit]()
+
+
+
+
 
 
 

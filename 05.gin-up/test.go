@@ -55,6 +55,11 @@ type FuncExprListener struct {
 	args     []reflect.Value
 }
 
+// ExitMethodCall is called when production methodCall is exited.
+func (this *FuncExprListener) ExitMethodCall(ctx *FuncExpr.MethodCallContext) {
+	log.Println("method 内容是： ", ctx.GetText())
+}
+
 // ExitFuncCall is called when production FuncCall is exited.
 func (this *FuncExprListener) ExitFuncCall(ctx *FuncExpr.FuncCallContext) {
 	log.Println("函数名是: ", ctx.GetStart().GetText())
@@ -110,7 +115,7 @@ func main() {
 		},
 	}
 
-	is := antlr.NewInputStream("test('custer',16)")
+	is := antlr.NewInputStream("User.test('custer',16)")
 	lexer := FuncExpr.NewBeanExprLexer(is)
 	ts := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	p := FuncExpr.NewBeanExprParser(ts)

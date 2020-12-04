@@ -1,7 +1,11 @@
 grammar BeanExpr;
 
 // Rules
-start : functionCall EOF;
+start : functionCall | methodCall EOF;
+
+methodCall
+    : MethodName '(' functionArgs? ')'
+    ;
 
 functionCall
     : FuncName '(' functionArgs? ')'  #FuncCall   //函数调用  譬如 GetAge()  或 GetUser(101)
@@ -20,6 +24,7 @@ StringArg: '\'' ('\\'. | '\'\'' | ~('\'' | '\\'))* '\'';
 FloatArg: '-'?Float;
 IntArg: '-'?DIGIT+;
 FuncName: [a-zA-Z][a-zA-Z0-9]*; //函数名称 必须字母开头, 支持数字字母的组合
+MethodName: FuncName (Dot FuncName)+; // user.age.abc.bcd
 Dot: '.';
 
 Float :(DIGIT+)? '.' DIGIT+   // 如 19.02  .02   目前不支持科学计数
