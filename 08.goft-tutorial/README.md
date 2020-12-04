@@ -236,5 +236,88 @@ func main() {
 
 `{"result":"index","version":"0.4.1"}`
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/be5d2dd2702135835ca3e7c832d8739512cf6f09#diff-5e031c8fe909e21e054d942a61a9503aad9eed28cc4d7bd5718110d4a74cd23eL8)
 
+### 04. 路由级的中间件(1):基本使用
+
+`main.go` 中 `Attach` 是全局中间件，会在请求结束后，修改响应对象，加入 `version` 版本号。
+
+```go
+func main() {
+	goft.Ignite().
+		Attach(middlewares.NewTokenCheck(), middlewares.NewAddVersion()).
+		Mount("v1", controllers.NewIndexController()).
+		Launch()
+}
+```
+
+下面针对 `/v1/test` 执行单独中间件，新增中间件 `src/middlewares/IndexTest.go`
+
+```go
+package middlewares
+
+import "github.com/gin-gonic/gin"
+
+type IndexTest struct{}
+
+func NewIndexTest() *IndexTest {
+	return &IndexTest{}
+}
+
+func (this *IndexTest) OnRequest(ctx *gin.Context) error {
+	return nil
+}
+
+func (this *IndexTest) OnResponse(result interface{}) (interface{}, error) {
+	if m, ok := result.(gin.H); ok {
+		m["metadata"] = "index test"
+		return m, nil
+	}
+	return result, nil
+}
+```
+
+然后在控制器中修改
+
+```go
+package controllers
+
+import (
+	"github.com/gin-gonic/gin"
+	"goft-tutorial/pkg/goft"
+	"goft-tutorial/src/middlewares"
+)
+
+type IndexController struct{}
+
+func NewIndexController() *IndexController {
+	return &IndexController{}
+}
+
+// 返回 json
+func (this *IndexController) Index(ctx *gin.Context) goft.Json {
+	//goft.Throw("测试异常", 500, ctx)
+	return gin.H{"result": "index"}
+}
+
+func (this *IndexController) IndexTest(ctx *gin.Context) goft.Json {
+	return gin.H{"result": "index test"}
+}
+
+func (this *IndexController) Name() string {
+	return "IndexController"
+}
+
+func (this *IndexController) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/", this.Index).
+		HandleWithFairing("GET", "/test", this.IndexTest, middlewares.NewIndexTest())
+}
+```
+
+针对路由的中间件拦截 `HandleWithFairing("GET", "/test", this.IndexTest, middlewares.NewIndexTest())`
+
+访问页面 http://localhost:8080/v1/test?token=123 可以看到**路由级针对单独`url`中间件的执行 **
+
+`{"metadata":"index test","result":"index test","version":"0.4.1"}`
+
+代码修改 [git commit]()
