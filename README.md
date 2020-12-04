@@ -2,6 +2,14 @@
 
 学习路线
 
+jtthink 知识库 https://65480539.gitbook.io/jtthink/
+
+Goft 脚手架使用文档 https://65480539.gitbook.io/goft/
+
+Go微服务+领域驱动+K8s新版实训课开更(第一阶段)  https://65480539.gitbook.io/gop1/
+
+
+
 Go 课程
 
 | 课程                                   | 连接                               | 进度                                                         |
@@ -13,7 +21,7 @@ Go 课程
 | 5. Go面试加强版  ⭐️⭐️                    | http://www.jtthink.com/course/120  |                                                              |
 | 6. Go之Gin实战速学基础篇               | http://www.jtthink.com/course/74   | [100%](https://github.com/custer-go/learn-gin/tree/main/01.gin-basic) |
 | 7. Go之Gin开发实战技巧篇               | http://www.jtthink.com/course/134  | [100%](https://github.com/custer-go/learn-gin/tree/main/02.gin-skill) |
-| 8. Go之Gin脚手架研发 ⭐️                 | http://www.jtthink.com/course/122  | [42%](https://github.com/custer-go/learn-gin/tree/main/05.gin-up) |
+| 8. Go之Gin脚手架研发 ⭐️                 | http://www.jtthink.com/course/122  | [100%](https://github.com/custer-go/learn-gin/tree/main/05.gin-up) |
 | 9. Go之Gin脚手架进化和领域驱动 ⭐️⭐️      | http://www.jtthink.com/course/127  |                                                              |
 | 10. Go Web场景实战(第一篇)：极致性能篇 | http://www.jtthink.com/course/100  |                                                              |
 | 11. Go Web+ElasticSearch7实战基础篇 ⭐️  | http://www.jtthink.com/course/104  |                                                              |
