@@ -19,23 +19,23 @@ var parserATN = []uint16{
 	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 12, 27, 4, 
 	2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 3, 2, 3, 2, 3, 2, 3, 3, 3, 3, 3, 3, 5, 
 	3, 15, 10, 3, 3, 3, 3, 3, 3, 4, 3, 4, 3, 4, 7, 4, 22, 10, 4, 12, 4, 14, 
-	4, 25, 11, 4, 3, 4, 2, 2, 5, 2, 4, 6, 2, 2, 2, 25, 2, 8, 3, 2, 2, 2, 4, 
-	11, 3, 2, 2, 2, 6, 18, 3, 2, 2, 2, 8, 9, 5, 4, 3, 2, 9, 10, 7, 2, 2, 3, 
-	10, 3, 3, 2, 2, 2, 11, 12, 7, 7, 2, 2, 12, 14, 7, 3, 2, 2, 13, 15, 5, 6, 
-	4, 2, 14, 13, 3, 2, 2, 2, 14, 15, 3, 2, 2, 2, 15, 16, 3, 2, 2, 2, 16, 17, 
-	7, 4, 2, 2, 17, 5, 3, 2, 2, 2, 18, 23, 7, 9, 2, 2, 19, 20, 7, 5, 2, 2, 
-	20, 22, 7, 9, 2, 2, 21, 19, 3, 2, 2, 2, 22, 25, 3, 2, 2, 2, 23, 21, 3, 
-	2, 2, 2, 23, 24, 3, 2, 2, 2, 24, 7, 3, 2, 2, 2, 25, 23, 3, 2, 2, 2, 4, 
-	14, 23,
+	4, 25, 11, 4, 3, 4, 2, 2, 5, 2, 4, 6, 2, 3, 3, 2, 6, 8, 2, 25, 2, 8, 3, 
+	2, 2, 2, 4, 11, 3, 2, 2, 2, 6, 18, 3, 2, 2, 2, 8, 9, 5, 4, 3, 2, 9, 10, 
+	7, 2, 2, 3, 10, 3, 3, 2, 2, 2, 11, 12, 7, 9, 2, 2, 12, 14, 7, 3, 2, 2, 
+	13, 15, 5, 6, 4, 2, 14, 13, 3, 2, 2, 2, 14, 15, 3, 2, 2, 2, 15, 16, 3, 
+	2, 2, 2, 16, 17, 7, 4, 2, 2, 17, 5, 3, 2, 2, 2, 18, 23, 9, 2, 2, 2, 19, 
+	20, 7, 5, 2, 2, 20, 22, 9, 2, 2, 2, 21, 19, 3, 2, 2, 2, 22, 25, 3, 2, 2, 
+	2, 23, 21, 3, 2, 2, 2, 23, 24, 3, 2, 2, 2, 24, 7, 3, 2, 2, 2, 25, 23, 3, 
+	2, 2, 2, 4, 14, 23,
 }
 var deserializer = antlr.NewATNDeserializer(nil)
 var deserializedATN = deserializer.DeserializeFromUInt16(parserATN)
 
 var literalNames = []string{
-	"", "'('", "')'", "','", "", "", "'.'",
+	"", "'('", "')'", "','", "", "", "", "", "'.'",
 }
 var symbolicNames = []string{
-	"", "", "", "", "StringArg", "FuncName", "Dot", "Args", "Int", "Number", 
+	"", "", "", "", "StringArg", "FloatArg", "IntArg", "FuncName", "Dot", "Float", 
 	"WHITESPACE",
 }
 
@@ -75,11 +75,11 @@ const (
 	BeanExprParserT__1 = 2
 	BeanExprParserT__2 = 3
 	BeanExprParserStringArg = 4
-	BeanExprParserFuncName = 5
-	BeanExprParserDot = 6
-	BeanExprParserArgs = 7
-	BeanExprParserInt = 8
-	BeanExprParserNumber = 9
+	BeanExprParserFloatArg = 5
+	BeanExprParserIntArg = 6
+	BeanExprParserFuncName = 7
+	BeanExprParserDot = 8
+	BeanExprParserFloat = 9
 	BeanExprParserWHITESPACE = 10
 )
 
@@ -339,7 +339,7 @@ func (p *BeanExprParser) FunctionCall() (localctx IFunctionCallContext) {
 	_la = p.GetTokenStream().LA(1)
 
 
-	if _la == BeanExprParserArgs {
+	if (((_la) & -(0x1f+1)) == 0 && ((1 << uint(_la)) & ((1 << BeanExprParserStringArg) | (1 << BeanExprParserFloatArg) | (1 << BeanExprParserIntArg))) != 0) {
 		{
 			p.SetState(11)
 			p.FunctionArgs()
@@ -428,12 +428,28 @@ func (s *FuncArgsContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *FuncArgsContext) AllArgs() []antlr.TerminalNode {
-	return s.GetTokens(BeanExprParserArgs)
+func (s *FuncArgsContext) AllFloatArg() []antlr.TerminalNode {
+	return s.GetTokens(BeanExprParserFloatArg)
 }
 
-func (s *FuncArgsContext) Args(i int) antlr.TerminalNode {
-	return s.GetToken(BeanExprParserArgs, i)
+func (s *FuncArgsContext) FloatArg(i int) antlr.TerminalNode {
+	return s.GetToken(BeanExprParserFloatArg, i)
+}
+
+func (s *FuncArgsContext) AllStringArg() []antlr.TerminalNode {
+	return s.GetTokens(BeanExprParserStringArg)
+}
+
+func (s *FuncArgsContext) StringArg(i int) antlr.TerminalNode {
+	return s.GetToken(BeanExprParserStringArg, i)
+}
+
+func (s *FuncArgsContext) AllIntArg() []antlr.TerminalNode {
+	return s.GetTokens(BeanExprParserIntArg)
+}
+
+func (s *FuncArgsContext) IntArg(i int) antlr.TerminalNode {
+	return s.GetToken(BeanExprParserIntArg, i)
 }
 
 
@@ -477,7 +493,14 @@ func (p *BeanExprParser) FunctionArgs() (localctx IFunctionArgsContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(16)
-		p.Match(BeanExprParserArgs)
+		_la = p.GetTokenStream().LA(1)
+
+		if !((((_la) & -(0x1f+1)) == 0 && ((1 << uint(_la)) & ((1 << BeanExprParserStringArg) | (1 << BeanExprParserFloatArg) | (1 << BeanExprParserIntArg))) != 0)) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
+		}
 	}
 	p.SetState(21)
 	p.GetErrorHandler().Sync(p)
@@ -491,7 +514,14 @@ func (p *BeanExprParser) FunctionArgs() (localctx IFunctionArgsContext) {
 		}
 		{
 			p.SetState(18)
-			p.Match(BeanExprParserArgs)
+			_la = p.GetTokenStream().LA(1)
+
+			if !((((_la) & -(0x1f+1)) == 0 && ((1 << uint(_la)) & ((1 << BeanExprParserStringArg) | (1 << BeanExprParserFloatArg) | (1 << BeanExprParserIntArg))) != 0)) {
+				p.GetErrorHandler().RecoverInline(p)
+			} else {
+				p.GetErrorHandler().ReportMatch(p)
+				p.Consume()
+			}
 		}
 
 

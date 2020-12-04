@@ -3879,5 +3879,195 @@ go run test.go
 
 代码变动 [git commit]()
 
+### 31. 函数表达式(2):带参数执行表达式
+
+比如带参数执行表达式
+
+```go
+	FuncMap= map[string]interface{}{
+	 	"test": func(name string,age int64) {
+			log.Println("this is ",name," and  age is :",age)
+		},
+	 }
+	is:=antlr.NewInputStream("test('shenyi',19)")
+```
+
+修改 `BeanExpr/BeanExpr.g4` 以支持参数
+
+```g4
+grammar BeanExpr;
+
+// Rules
+start : functionCall EOF;
+
+functionCall
+    : FuncName '(' functionArgs? ')'  #FuncCall   //函数调用  譬如 GetAge()  或 GetUser(101)
+    ;
+
+//参数目前先支持 字符串或 数字
+functionArgs
+            : (FloatArg | StringArg | IntArg) (',' (FloatArg | StringArg | IntArg))* #FuncArgs //带一个，为分隔符的序列
+            ;
+//fragment标识的规则只能为其它词法规则提供基础
+fragment DIGIT: [0-9];
+
+//以下是Token
+//字符串 参数 用单引号  如 'abc' 也可以是 '\'abc\'' 支持单引号转义
+StringArg: '\'' ('\\'. | '\'\'' | ~('\'' | '\\'))* '\'';
+FloatArg: '-'?Float;
+IntArg: '-'?DIGIT+;
+FuncName: [a-zA-Z][a-zA-Z0-9]*; //函数名称 必须字母开头, 支持数字字母的组合
+Dot: '.';
+
+Float :(DIGIT+)? '.' DIGIT+   // 如 19.02  .02   目前不支持科学计数
+       ;
+WHITESPACE: [ \r\n\t]+ -> skip;
+```
+
+右键 `Generate ANTLR Recognizer` 选择重新生成 `FuncExpr` 文件。
+
+修改 `test.go` 
+
+```go
+type FuncExprListener struct {
+	*FuncExpr.BaseBeanExprListener
+	funcName string
+}
+
+// ExitFuncCall is called when production FuncCall is exited.
+func (this *FuncExprListener) ExitFuncCall(ctx *FuncExpr.FuncCallContext) {
+	log.Println("函数名是: ", ctx.GetStart().GetText())
+	this.funcName = ctx.GetStart().GetText()
+}
+
+// EnterFuncArgs is called when production FuncArgs is entered.
+func (this *FuncExprListener) EnterFuncArgs(ctx *FuncExpr.FuncArgsContext) {
+  log.Println("参数是: ", ctx.GetText())
+	log.Println("参数个数是: ", ctx.GetChildCount())
+	log.Println("参数0: ", ctx.GetChild(0), "参数1: ", ctx.GetChild(1), "参数2: ", ctx.GetChild(2))
+}
+
+func (this *FuncExprListener) Run() {
+}
+
+var FuncMap map[string]interface{}
+
+func main() {
+	FuncMap = map[string]interface{}{
+		"test": func(name string, age int64) {
+			log.Println("this is ", name, " and age is: ", age)
+		},
+	}
+
+	is := antlr.NewInputStream("test('custer',16)")
+	lexer := FuncExpr.NewBeanExprLexer(is)
+	ts := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	p := FuncExpr.NewBeanExprParser(ts)
+	lis := &FuncExprListener{}
+	antlr.ParseTreeWalkerDefault.Walk(lis, p.Start())
+	lis.Run()
+}
+```
+
+执行可以看到 
+
+```bash
+go run test.go
+2020/12/04 11:02:13 参数是:  'custer',16
+2020/12/04 11:02:13 参数个数是:  3
+2020/12/04 11:02:13 参数0:  'custer' 参数1:  , 参数2:  16
+2020/12/04 11:02:13 函数名是:  test
+```
+
+修改 `test.go`
+
+```go
+type FuncExprListener struct {
+	*FuncExpr.BaseBeanExprListener
+	funcName string
+	args     []reflect.Value
+}
+
+// ExitFuncCall is called when production FuncCall is exited.
+func (this *FuncExprListener) ExitFuncCall(ctx *FuncExpr.FuncCallContext) {
+	log.Println("函数名是: ", ctx.GetStart().GetText())
+	this.funcName = ctx.GetStart().GetText()
+}
+
+// EnterFuncArgs is called when production FuncArgs is entered.
+func (this *FuncExprListener) EnterFuncArgs(ctx *FuncExpr.FuncArgsContext) {
+	for i := 0; i < ctx.GetChildCount(); i++ {
+		token := ctx.GetChild(i).GetPayload().(*antlr.CommonToken)
+		var value reflect.Value
+		switch token.GetTokenType() {
+		case FuncExpr.BeanExprLexerStringArg:
+			stringArg := strings.Trim(token.GetText(), "'")
+			value = reflect.ValueOf(stringArg)
+			break
+		case FuncExpr.BeanExprLexerIntArg:
+			v, err := strconv.ParseInt(token.GetText(), 10, 64)
+			if err != nil {
+				panic("parse int64 error")
+			}
+			value = reflect.ValueOf(v)
+			break
+		case FuncExpr.BeanExprLexerFloatArg:
+			v, err := strconv.ParseFloat(token.GetText(), 64)
+			if err != nil {
+				panic("parse float64 error")
+			}
+			value = reflect.ValueOf(v)
+			break
+		default:
+			continue
+		}
+		this.args = append(this.args, value)
+	}
+}
+
+func (this *FuncExprListener) Run() {
+	if f, ok := FuncMap[this.funcName]; ok {
+		v := reflect.ValueOf(f)
+		if v.Kind() == reflect.Func {
+			v.Call(this.args)
+		}
+	}
+}
+
+var FuncMap map[string]interface{}
+
+func main() {
+	FuncMap = map[string]interface{}{
+		"test": func(name string, age int64) {
+			log.Println("this is ", name, " and age is: ", age)
+		},
+	}
+
+	is := antlr.NewInputStream("test('custer',16)")
+	lexer := FuncExpr.NewBeanExprLexer(is)
+	ts := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	p := FuncExpr.NewBeanExprParser(ts)
+	lis := &FuncExprListener{}
+	antlr.ParseTreeWalkerDefault.Walk(lis, p.Start())
+	lis.Run()
+}
+```
+
+运行代码
+
+```bash
+go run test.go
+2020/12/04 11:07:17 函数名是:  test
+2020/12/04 11:07:17 this is  custer  and age is:  16
+```
+
+代码变动 [git commit]()
+
+
+
+
+
+
+
 
 

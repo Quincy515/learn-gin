@@ -6,7 +6,9 @@ import (
 	parser "gin-up/test"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"log"
+	"reflect"
 	"strconv"
+	"strings"
 )
 
 type Me struct{}
@@ -50,6 +52,7 @@ func (this *calcListener) ExitNumber(ctx *parser.NumberContext) {
 type FuncExprListener struct {
 	*FuncExpr.BaseBeanExprListener
 	funcName string
+	args     []reflect.Value
 }
 
 // ExitFuncCall is called when production FuncCall is exited.
@@ -58,22 +61,56 @@ func (this *FuncExprListener) ExitFuncCall(ctx *FuncExpr.FuncCallContext) {
 	this.funcName = ctx.GetStart().GetText()
 }
 
-func (this *FuncExprListener) Run() {
-	if f, ok := FuncMap[this.funcName]; ok {
-		f()
+// EnterFuncArgs is called when production FuncArgs is entered.
+func (this *FuncExprListener) EnterFuncArgs(ctx *FuncExpr.FuncArgsContext) {
+	for i := 0; i < ctx.GetChildCount(); i++ {
+		token := ctx.GetChild(i).GetPayload().(*antlr.CommonToken)
+		var value reflect.Value
+		switch token.GetTokenType() {
+		case FuncExpr.BeanExprLexerStringArg:
+			stringArg := strings.Trim(token.GetText(), "'")
+			value = reflect.ValueOf(stringArg)
+			break
+		case FuncExpr.BeanExprLexerIntArg:
+			v, err := strconv.ParseInt(token.GetText(), 10, 64)
+			if err != nil {
+				panic("parse int64 error")
+			}
+			value = reflect.ValueOf(v)
+			break
+		case FuncExpr.BeanExprLexerFloatArg:
+			v, err := strconv.ParseFloat(token.GetText(), 64)
+			if err != nil {
+				panic("parse float64 error")
+			}
+			value = reflect.ValueOf(v)
+			break
+		default:
+			continue
+		}
+		this.args = append(this.args, value)
 	}
 }
 
-var FuncMap map[string]func()
+func (this *FuncExprListener) Run() {
+	if f, ok := FuncMap[this.funcName]; ok {
+		v := reflect.ValueOf(f)
+		if v.Kind() == reflect.Func {
+			v.Call(this.args)
+		}
+	}
+}
+
+var FuncMap map[string]interface{}
 
 func main() {
-	FuncMap = map[string]func(){
-		"test": func() {
-			log.Println("this is test")
+	FuncMap = map[string]interface{}{
+		"test": func(name string, age int64) {
+			log.Println("this is ", name, " and age is: ", age)
 		},
 	}
 
-	is := antlr.NewInputStream("test()")
+	is := antlr.NewInputStream("test('custer',16)")
 	lexer := FuncExpr.NewBeanExprLexer(is)
 	ts := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	p := FuncExpr.NewBeanExprParser(ts)
