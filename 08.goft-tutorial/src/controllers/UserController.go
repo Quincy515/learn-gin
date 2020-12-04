@@ -3,6 +3,7 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 	"goft-tutorial/pkg/goft"
+	"goft-tutorial/src/middlewares"
 	"goft-tutorial/src/models"
 )
 
@@ -17,11 +18,10 @@ func (this *UserController) Name() string {
 }
 
 func (this *UserController) Build(goft *goft.Goft) {
-	goft.Handle("GET", "/user/:uid", this.UserDetail)
+	goft.HandleWithFairing("GET", "/user/:uid", this.UserDetail, middlewares.NewUserMiddleware())
 }
 
 func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
-	req := models.NewUserDetailRequest()
-	goft.Error(ctx.BindUri(req)) // 出错就自动抛出异常，没有错误就继续执行
-	return gin.H{"result": models.NewUserModel(req.UserId, "testUserName")}
+	req, _ := ctx.Get("_req")
+	return gin.H{"result": models.NewUserModel(req.(*models.UserDetailRequest).UserId, "testUserName")}
 }

@@ -427,4 +427,58 @@ func main() {
 
 下面分离代码在控制器中仅仅处理业务，验证部分代码可以专门封装到中间件中，一旦以后参数验证规则发生改变，就不需要更改 `controller` 代码，只需要修改中间件或者替换中间件。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/6b2e020b9ef9568c92c8c5dbb153ea467b1bcb13#diff-5e031c8fe909e21e054d942a61a9503aad9eed28cc4d7bd5718110d4a74cd23eL9)
+
+### 06. 路由级的中间件(2):参数验证和业务分离（下）
+
+由于现在有路由级的中间件，所以可以创建一个中间件 `src/middlewares/UserMiddleware.go`
+
+```go
+package middlewares
+
+import (
+	"github.com/gin-gonic/gin"
+	"goft-tutorial/pkg/goft"
+	"goft-tutorial/src/models"
+)
+
+type UserMiddleware struct{}
+
+func NewUserMiddleware() *UserMiddleware {
+	return &UserMiddleware{}
+}
+
+func (this *UserMiddleware) OnRequest(ctx *gin.Context) error {
+	req := models.NewUserDetailRequest()
+	goft.Error(ctx.BindUri(req))
+	ctx.Set("_req", req)
+	return nil
+}
+
+func (this *UserMiddleware) OnResponse(result interface{}) (interface{}, error) {
+	return result, nil
+}
+```
+
+参数验证放入中间件中，控制器只处理逻辑
+
+```go
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
+	req, _ := ctx.Get("_req")
+	return gin.H{"result": models.NewUserModel(req.(*models.UserDetailRequest).UserId, "testUserName")}
+}
+```
+
+把中间件和路由匹配到一起
+
+```go
+func (this *UserController) Build(goft *goft.Goft) {
+	goft.HandleWithFairing("GET", "/user/:uid", this.UserDetail, middlewares.NewUserMiddleware())
+}
+```
+
+运行代码访问 http://localhost:8080/v1/user/2?token=1 可以看到和之前结果相同。
+
+但是参数处理，和业务处理已经通过路由级中间件分离开来。
+
 代码变动 [git commit]()
