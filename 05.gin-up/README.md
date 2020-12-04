@@ -4460,7 +4460,135 @@ go run main.go --version
 version is 0.1
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/3b5c6a67d65ccc6ef56a27fb8b40d04d3dd11e3a#diff-23f710365b2c71fb864825b4fc4c1f7f71efd5efb3512bcff1d4c57b7d89eb5fR1)
+
+### 35. 脚手架工具开发:生成控制器命令(上)
+
+#### 设计命令
+
+（脚手架的名称为 `goft`）
+
+自动创建控制器命令 `goft new controller user`
+
+#### 生成规则
+
+1、`user` 代表是控制器名称，则会自动创建到 `src/classes` 下
+
+2、生成的文件名是 `UserClass.go`
+
+3、暂时生成到文件夹 `src/classes` 目录下
+
+#### 添加命令
+
+1、`cd` 进入  `src`
+
+2、执行 `cobra add new`
+
+此时会创建出 `new.go`。`cmd` 的名称是 `newCmd` （驼峰式）。
+
+回到根目录执行 `go run main.go new` 会在控制台出现 `new called`
+
+再创建个 `controller.go`子命令
+
+回到根目录执行 `go run main.go new controller` 会在控制台出现 `new called`，
+
+因为 `cobra add controller` 是自动创建 `root` 的子命令。
+
+修改 `src/cmd/controller.go`
+
+```go
+func init() {
+	newCmd.AddCommand(controllerCmd)
+}
+```
+
+再执行  `go run main.go new controller` 会在控制台出现 `gen controller `，
+
+这样 `controller` 就变成了 `new` 的子命令。
+
+官方还提供的方法有：
+
+- NoArgs - 如果存在任何位置参数，该命令将报错
+- ArbitraryArgs - 该命令会接受任何位置参数
+- OnlyValidArgs - 如果有任何位置参数不在命令的 ValidArgs 字段中，该命令将报错
+- MinimumNArgs(int) - 至少要有 N 个位置参数，否则报错
+- MaximumNArgs(int) - 如果位置参数超过 N 个将报错
+- ExactArgs(int) - 必须有 N 个位置参数，否则报错
+- ExactValidArgs(int) 必须有 N 个位置参数，且都在命令的 ValidArgs 字段中，否则报错
+- RangeArgs(min, max) - 如果位置参数的个数不在区间 min 和 max 之中，报错
+
+比如 
+
+```go
+var controllerCmd = &cobra.Command{
+	Use:   "controller",
+	Short: "控制器",
+	Long:  `生成控制器.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("gen controller ")
+	},
+	Args: cobra.MinimumNArgs(1), // 至少有一个参数
+}
+```
+
+执行 `go run main.go new controller abc` 必须要带一个参数，返回 `gen controller `。
+
+#### 创建思路
+
+注意这里的 `helper` 和 `templates` 文件夹，内容比较多，相关课程是 http://www.jtthink.com/course/105
+
+使用模板引擎
+
+修改 `src/cmd/controller.go` 文件
+
+```go
+package cmd
+
+import (
+	"fmt"
+	Helper "tool/src/helper"
+
+	"github.com/spf13/cobra"
+)
+
+// controllerCmd represents the controller command
+var controllerCmd = &cobra.Command{
+	Use:   "controller",
+	Short: "控制器",
+	Long:  `生成控制器.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// 根据模板生成控制器
+		Helper.GenFile(string(Helper.ReadFile("src/templates/controller.tpl")),
+			fmt.Sprintf("/src/classes/%sClass.go", Helper.Ucfirst(args[0])),
+			map[string]interface{}{
+				"ControllerName": args[0],
+			},
+		)
+		fmt.Println("控制器生成成功")
+	},
+	Args: cobra.MinimumNArgs(1), // 至少有一个参数
+}
+
+func init() {
+	newCmd.AddCommand(controllerCmd)
+}
+```
+
+执行 `go run main.go new controller user` 会在目录 `src/classes` 下生成 `UserClass.go` 文件。
+
+`templates` 模板的 `controller.tpl` 文件需要编译到二进制程序中，
+
+否则使用的时候需要读取 `ReadFile("src/templates/controller.tpl")`。
+
 代码变动 [git commit]()
+
+
+
+
+
+
+
+
 
 
 
