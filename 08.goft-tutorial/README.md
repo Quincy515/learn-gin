@@ -709,5 +709,15 @@ type UserController struct {
 
 这样就可以直接返回 `SQL` 语句或者 `JSON`
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/bb16f7e3d45fb284c29142b2c59cec7d094eb0c7#diff-2583763e3a634de0ff7874859a53ffbb3f375c2686c373cc1536ca5bae00b9b9L1)
 
+### 10. 控制器返回SQL语句：支持参数
+
+```go
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
+	return goft.SimpleQuery("SELECT * FROM users WHERE user_id=?").
+		WithArgs(ctx.Param("uid")).WithFirst() // WithArgs 返回包含对象的数组，WithFirst 直接返回第一个对象
+}
+```
+
+代码变动 [git commit]()

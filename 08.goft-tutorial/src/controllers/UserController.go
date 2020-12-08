@@ -3,14 +3,13 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 	"goft-tutorial/pkg/goft"
-	"goft-tutorial/src/configure"
 	"goft-tutorial/src/middlewares"
-	"goft-tutorial/src/models"
+	"gorm.io/gorm"
 )
 
 type UserController struct {
-	//Db *gorm.DB `inject:"-"` // 依赖注入 - 表示单例模式
-	Db *configure.XOrmAdapter `inject:"-"`
+	Db *gorm.DB `inject:"-"` // 依赖注入 - 表示单例模式
+	//Db *configure.XOrmAdapter `inject:"-"`
 }
 
 func NewUserController() *UserController {
@@ -22,7 +21,8 @@ func (this *UserController) Name() string {
 }
 
 func (this *UserController) Build(goft *goft.Goft) {
-	goft.HandleWithFairing("GET", "/user/:uid", this.UserDetail, middlewares.NewUserMiddleware())
+	goft.Handle("GET", "/users", this.UserList).
+		HandleWithFairing("GET", "/user/:uid", this.UserDetail, middlewares.NewUserMiddleware())
 }
 
 //func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
@@ -34,13 +34,22 @@ func (this *UserController) Build(goft *goft.Goft) {
 //}
 
 //func (this *UserController) UserDetail(ctx *gin.Context) goft.SimpleQuery {
-//	return "SELECT * FROM users WHERE user_id=2"
+//	return goft.SimpleQuery(fmt.Sprintf("SELECT * FROM users WHERE user_id=%d", 3))
 //}
 
-func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
-	user := &models.UserModel{}
-	_, err := this.Db.Table("users").Where("user_id=?", 2).
-		Get(user)
-	goft.Error(err)
-	return user
+//func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
+//	user := &models.UserModel{}
+//	_, err := this.Db.Table("users").Where("user_id=?", 2).
+//		Get(user)
+//	goft.Error(err)
+//	return user
+//}
+
+func (this *UserController) UserList(ctx *gin.Context) goft.SimpleQuery {
+	return "select * from users"
+}
+
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
+	return goft.SimpleQuery("SELECT * FROM users WHERE user_id=?").
+		WithArgs(ctx.Param("uid")).WithFirst() // WithArgs 返回包含对象的数组，WithFirst 直接返回第一个对象
 }
