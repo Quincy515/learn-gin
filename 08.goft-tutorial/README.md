@@ -632,7 +632,82 @@ func (this *UserController) UserDetail(ctx *gin.Context) goft.SimpleQuery {
 }
 ```
 
- 代码变动 [git commit]()
+ 代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/dee7d9d26daaab08cb76502bb7e1aa957f14d5d4#diff-fe3b020a336c7e0ea80e1ee4f700c33695d0a78c695d938e5b309e99e559e621L4)
 
+### 09. ORM执行简化:控制器直接返回SQL语句(XORM)
 
+上面在控制器中直接返回 `SQL` 语句，下面适配 `xorm`
+
+首先安装 `xorm` `go get xorm.io/xorm` 在文件 `src/configure/DBConfig.go` 中，
+
+初始化 `xorm`
+
+```go
+func (this *DBConfig) XOrm() *xorm.Engine {
+	engine, err := xorm.NewEngine("mysql", "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	engine.DB().SetMaxIdleConns(5)
+	engine.DB().SetMaxOpenConns(10)
+	return engine
+}
+```
+
+修改 `UserController.go`
+
+```go
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
+	user := &models.UserModel{}
+	_, err := this.Db.Table("users").Where("user_id=?", 2).
+		Get(user)
+	goft.Error(err)
+	return user
+}
+```
+
+访问 http://localhost:8080/v1/user/2?token=1 可以看到 `{"user_id":2,"user_name":"lisi"}`
+
+直接返回 `SQL` 语句
+
+```go
+func (this *UserController) UserDetail(ctx *gin.Context) goft.SimpleQuery {
+	return "SELECT * FROM users WHERE user_id=2"
+}
+```
+
+修改 `XormAdapter` 适配器
+
+```go
+type XOrmAdapter struct {
+	*xorm.Engine
+}
+
+func (this *XOrmAdapter) DB() *sql.DB {
+	return this.Engine.DB().DB
+}
+
+func (this *DBConfig) XOrm() *XOrmAdapter {
+	engine, err := xorm.NewEngine("mysql", "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	engine.DB().SetMaxIdleConns(5)
+	engine.DB().SetMaxOpenConns(10)
+	return &XOrmAdapter{Engine: engine}
+}
+```
+
+注入：
+
+```go
+type UserController struct {
+	//Db *gorm.DB `inject:"-"` // 依赖注入 - 表示单例模式
+	Db *configure.XOrmAdapter `inject:"-"`
+}
+```
+
+这样就可以直接返回 `SQL` 语句或者 `JSON`
+
+代码变动 [git commit]()
 

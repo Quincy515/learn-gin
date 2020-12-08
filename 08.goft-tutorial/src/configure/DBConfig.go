@@ -1,6 +1,8 @@
 package configure
 
 import (
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -8,6 +10,7 @@ import (
 	"log"
 	"os"
 	"time"
+	"xorm.io/xorm"
 )
 
 type DBConfig struct{}
@@ -43,4 +46,22 @@ func (this *DBConfig) GormDB() *gorm.DB {
 	mysqlDB.SetMaxOpenConns(10)                  //最大打开连接数
 	mysqlDB.SetConnMaxLifetime(time.Second * 30) //空闲连接生命周期
 	return db
+}
+
+type XOrmAdapter struct {
+	*xorm.Engine
+}
+
+func (this *XOrmAdapter) DB() *sql.DB {
+	return this.Engine.DB().DB
+}
+
+func (this *DBConfig) XOrm() *XOrmAdapter {
+	engine, err := xorm.NewEngine("mysql", "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	engine.DB().SetMaxIdleConns(5)
+	engine.DB().SetMaxOpenConns(10)
+	return &XOrmAdapter{Engine: engine}
 }

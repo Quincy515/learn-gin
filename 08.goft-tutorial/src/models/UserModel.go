@@ -10,8 +10,8 @@ func NewUserDetailRequest() *UserDetailRequest {
 }
 
 type UserModel struct {
-	UserId   int
-	UserName string
+	UserId   int    `gorm:"column:user_id" json:"user_id" xorm:"'user_id'"`
+	UserName string `gorm:"column:user_name" json:"user_name" xorm:"'user_name'"`
 }
 
 func NewUserModel(userId int, userName string) *UserModel {
