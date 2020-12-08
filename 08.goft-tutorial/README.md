@@ -720,4 +720,47 @@ func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/d3fbb67a9fa2518eac8d02364603847d3c75ec07#diff-fe3b020a336c7e0ea80e1ee4f700c33695d0a78c695d938e5b309e99e559e621L3)
+
+### 11. 控制器返回SQL语句：支持自定义JSON字段
+
+第一种方式 使用 `SQL`
+
+```go
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
+	return goft.SimpleQuery(`
+			SELECT 
+				user_id as uid, user_name as uname
+			FROM 
+				users
+			WHERE
+				user_id=?`).
+		WithArgs(ctx.Param("uid")).WithFirst() // WithArgs 返回包含对象的数组，WithFirst 直接返回第一个对象
+}
+```
+
+访问 http://localhost:8080/v1/user/3?token=1 {"userID":"3","userName":"custer"}
+
+第二种方式 使用 `WithMapping`
+
+```go
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
+	return goft.SimpleQuery(`
+			SELECT 
+				user_id, user_name
+			FROM 
+				users
+			WHERE
+				user_id=?`).
+		WithArgs(ctx.Param("uid")).WithFirst(). // WithArgs 返回包含对象的数组，WithFirst 直接返回第一个对象
+		WithMapping(map[string]string{
+			"user_id":   "userID",
+			"user_name": "userName",
+		})
+}
+```
+
+访问http://localhost:8080/v1/user/3?token=1{"userID":"3","userName":"custer"}
+
 代码变动 [git commit]()
+
