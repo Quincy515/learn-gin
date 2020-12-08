@@ -599,5 +599,40 @@ func (this *UserController) UserDetail(ctx *gin.Context) goft.Json {
 
 访问 http://localhost:8080/v1/user/2?token=1 可以看到 `{"UserId":2,"UserName":"lisi"}`
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/4d8e0ff6954b8c450907907b0200d6d1f035c8df#diff-5e031c8fe909e21e054d942a61a9503aad9eed28cc4d7bd5718110d4a74cd23eL2)
+
+### 08. ORM执行简化:直接返回SQL语句(GORM)
+
+目录结构
+
+```bash
+├── README.md
+├── go.mod
+├── go.sum
+├── main.go
+└── src                            // 源码目录
+    ├── configure                  // 若干个 config 对象
+    │   └── DBConfig.go            // 返回需要注入到容器里的对象
+    ├── controllers                // 控制器
+    │   ├── IndexController.go
+    ├── middlewares                // 中间件
+    │   ├── AddVersion.go
+    └── models                     // 模型包含请求实体和验证
+        └── UserModel.go
+
+```
+
+上面访问 http://localhost:8080/v1/user/2?token=1 可以看到 `{"UserId":2,"UserName":"lisi"}`
+
+修改代码`UserDetail ` `src/controllers/UserController.go` 直接返回 `SQL` 语句 `goft.SimpleQuery`
+
+```go
+func (this *UserController) UserDetail(ctx *gin.Context) goft.SimpleQuery {
+	return "SELECT * FROM users WHERE user_id=2"
+}
+```
+
+ 代码变动 [git commit]()
+
+
 
