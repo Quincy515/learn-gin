@@ -762,5 +762,116 @@ func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
 
 访问http://localhost:8080/v1/user/3?token=1{"userID":"3","userName":"custer"}
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/b2ce5cd0cf23c19ee6a58f501790381bdec9d300#diff-fe3b020a336c7e0ea80e1ee4f700c33695d0a78c695d938e5b309e99e559e621L50)
+
+### 12. DAO层示例：用户DAO的写法
+
+`DAO` -- `data access object` 数据访问层，即写一个类 (struct), 把数据库操作的代码封装起来。
+
+定位 -- 介于 `controller` 和 `service` 层之间。
+
+新建文件 `src/daos/UserDAO.go`
+
+```go
+package daos
+
+import "goft-tutorial/pkg/goft"
+
+type UserDAO struct{}
+
+func (this *UserDAO) GetUserDetail(uid interface{}) goft.Query {
+	return goft.SimpleQuery(`
+			SELECT 
+				user_id, user_name
+			FROM 
+				users
+			WHERE
+				user_id=?`).
+		WithArgs(uid).WithFirst(). // WithArgs 返回包含对象的数组，WithFirst 直接返回第一个对象
+		WithMapping(map[string]string{
+			"user_id":   "userID",
+			"user_name": "userName",
+		})
+}
+```
+
+然后在 `src/controller/UserController.go` 中使用依赖注入
+
+```go
+package controllers
+
+import (
+	"github.com/gin-gonic/gin"
+	"goft-tutorial/pkg/goft"
+	"goft-tutorial/src/daos"
+	"goft-tutorial/src/middlewares"
+	"gorm.io/gorm"
+)
+
+type UserController struct {
+	Db *gorm.DB `inject:"-"` // 依赖注入 - 表示单例模式
+	//Db *configure.XOrmAdapter `inject:"-"`
+	user *daos.UserDAO
+}
+
+func NewUserController() *UserController {
+	return &UserController{}
+}
+
+func (this *UserController) Name() string {
+	return "UserController"
+}
+
+func (this *UserController) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/users", this.UserList).
+		HandleWithFairing("GET", "/user/:uid", this.UserDetail, middlewares.NewUserMiddleware())
+}
+
+func (this *UserController) UserList(ctx *gin.Context) goft.SimpleQuery {
+	return "select * from users"
+}
+
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
+	return this.user.GetUserDetail(ctx.Param("uid"))
+}
+```
+
+这里控制器 `controller` 和 数据访问层 `dao` 直接关联，中间没有使用 `service` 层也是可以的。
+
+在 `DAO` 层还要一种写法，把 `SQL` 语句写成常量单独放在一个文件中
+
+```go
+package daos
+
+import "goft-tutorial/pkg/goft"
+
+type UserDAO struct{}
+
+const getUserByID = `
+			SELECT 
+				user_id, user_name
+			FROM 
+				users
+			WHERE
+				user_id=?`
+
+func (this *UserDAO) GetUserDetail(uid interface{}) goft.Query {
+	return goft.SimpleQuery(getUserByID).
+		WithArgs(uid).WithFirst(). // WithArgs 返回包含对象的数组，WithFirst 直接返回第一个对象
+		WithMapping(map[string]string{
+			"user_id":   "userID",
+			"user_name": "userName",
+		})
+}
+```
+
+访问 localhost:8080/v1/user/3?token=1 可以看到 `{"userID":"3","userName":"custer"}`,
+
+如果访问 localhost:8080/v1/user/13?token=1 没有数据就返回的是 `[]`，
+
+因此需要个 `service` 层专门进行处理判断，如果取不出怎么做，如果取出来了怎么做。
+
 代码变动 [git commit]()
+
+
 
