@@ -871,7 +871,174 @@ func (this *UserDAO) GetUserDetail(uid interface{}) goft.Query {
 
 因此需要个 `service` 层专门进行处理判断，如果取不出怎么做，如果取出来了怎么做。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/66529bcd861b48f7aa33abccdced8741f885b0ce?branch=66529bcd861b48f7aa33abccdced8741f885b0ce&diff=split#diff-fe3b020a336c7e0ea80e1ee4f700c33695d0a78c695d938e5b309e99e559e621L3)
+
+### 13. Service层示例：用户Service层的基本写法
+
+`service` 层 -- 往往用来结合 `DAO` 处理业务相关操作。一般 `service` 只调用自己的 `DAO`。
+
+如果想调用其他 `dao` ，则通过引入该层的 `service` 。
+
+`Controller` 层负责定义路由和连接 `Service` 层的整合。
+
+为了后面的依赖注入，在 `configuration` 中写 `ServiceConfig.go`，
+
+专门把 `Bean` 注入到 `IOC` 容器。
+
+```go
+package configure
+
+import (
+	"goft-tutorial/src/daos"
+	"goft-tutorial/src/service"
+)
+
+type ServiceConfig struct{}
+
+func NewServiceConfig() *ServiceConfig {
+	return &ServiceConfig{}
+}
+
+func (this *ServiceConfig) UserDao() *daos.UserDAO {
+	return daos.NewUserDAO()
+}
+
+func (this *ServiceConfig) UserService() *service.UserService {
+	return service.NewUserService()
+}
+```
+
+因为要注入 `Bean` 中，所以要修改 `main.go`
+
+```go
+func main() {
+	goft.Ignite().
+		Config(configure.NewDBConfig(), configure.NewServiceConfig()).
+		Attach(middlewares.NewTokenCheck(), middlewares.NewAddVersion()).
+		Mount("v1", controllers.NewIndexController(),
+			controllers.NewUserController()).
+		Launch()
+}
+```
+
+这样所有的 `service` `Bean` 都可以依赖注入。
+
+在 `src` 中创建文件夹 `service` ，新建文件 `UserService.go`。
+
+```go
+package service
+
+import (
+	"goft-tutorial/pkg/goft"
+	"goft-tutorial/src/daos"
+	"strconv"
+)
+
+type UserService struct {
+	UserDao *daos.UserDAO `inject:"-"`
+}
+
+func NewUserService() *UserService {
+	return &UserService{}
+}
+
+func (this *UserService) GetUserDetail(param string) goft.Query {
+	if uid, err := strconv.Atoi(param); err == nil {
+		return this.UserDao.GetUserByID(uid)
+	} else {
+		return this.UserDao.GetUserByName(param)
+	}
+}
+```
+
+修改 `src/daos/UserDAO.go`
+
+```go
+package daos
+
+import "goft-tutorial/pkg/goft"
+
+type UserDAO struct{}
+
+func NewUserDAO() *UserDAO {
+	return &UserDAO{}
+}
+
+const getUserByID = `
+			SELECT 
+				user_id, user_name
+			FROM 
+				users
+			WHERE
+				user_id=?`
+
+func (this *UserDAO) GetUserByID(uid int) goft.Query {
+	return goft.SimpleQuery(getUserByID).
+		WithArgs(uid).WithFirst(). // WithArgs 返回包含对象的数组，WithFirst 直接返回第一个对象
+		WithMapping(map[string]string{
+			"user_id":   "userID",
+			"user_name": "userName",
+		})
+}
+
+func (this *UserDAO) GetUserByName(uname string) goft.Query {
+	return goft.SimpleQuery(`
+			SELECT 
+				user_id, user_name
+			FROM 
+				users
+			WHERE
+				user_name=?`).
+		WithArgs(uname).WithFirst()
+}
+```
+
+修改 `UserController.go`
+
+```go
+package controllers
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"goft-tutorial/pkg/goft"
+	"goft-tutorial/src/service"
+	"gorm.io/gorm"
+)
+
+type UserController struct {
+	Db *gorm.DB `inject:"-"` // 依赖注入 - 表示单例模式
+	//Db *configure.XOrmAdapter `inject:"-"`
+	UserService *service.UserService `inject:"-"`
+}
+
+func NewUserController() *UserController {
+	return &UserController{}
+}
+
+func (this *UserController) Name() string {
+	return "UserController"
+}
+
+func (this *UserController) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/users", this.UserList).
+		//HandleWithFairing("GET", "/user/:uid", this.UserDetail, middlewares.NewUserMiddleware())
+		Handle("GET", "/user/:uid", this.UserDetail)
+}
+
+func (this *UserController) UserList(ctx *gin.Context) goft.SimpleQuery {
+	return "select * from users"
+}
+
+func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
+	fmt.Println("uid:", ctx.Param("uid"))
+	return this.UserService.GetUserDetail(ctx.Param("uid"))
+}
+```
+
+访问 localhost:8080/v1/user/custer?token=1 看到 `{"user_id":"3","user_name":"custer"}`
+
+访问 localhost:8080/v1/user/2?token=1 看到 `{"userID":"2","userName":"lisi"}`
+
 代码变动 [git commit]()
-
-
 
