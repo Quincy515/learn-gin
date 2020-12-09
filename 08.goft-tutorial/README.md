@@ -1136,6 +1136,84 @@ func (this *UserController) UserAccessToken(ctx *gin.Context) goft.Json {
 
 访问 localhost:8080/v1/access_token?uname=custer&id=3 返回 `{"token":"tokencuster","version":"0.4.1"}`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e72e231b098f760d2b0b49c7e44bcc15eeed4474?branch=e72e231b098f760d2b0b49c7e44bcc15eeed4474&diff=split#diff-5e031c8fe909e21e054d942a61a9503aad9eed28cc4d7bd5718110d4a74cd23eL10)
+
+### 15. ORM简化：自定义输出key、Query执行
+
+特别简单的 `SQL` 语句，或者特别复杂的 `SQL` 语句，可以直接返回 `goft.SimpleQuery`
+
+```go
+func (this *UserController) UserList(ctx *gin.Context) goft.SimpleQuery {
+	return "select * from users"
+}
+```
+
+修改为 `map["result"]map[string]interface{}`
+
+```go
+func (this *UserController) UserList(ctx *gin.Context) goft.Json {
+	//return "select * from users"
+	return goft.SimpleQuery("select * from users").WithKey("result").Get()
+}
+```
+
+访问 localhost:8080/v1/users 可以看到
+
+```json
+{
+    "result": [
+        {
+            "tenant_id": "1",
+            "user_id": "1",
+            "user_name": "shenyi"
+        },
+        {
+            "tenant_id": "2",
+            "user_id": "2",
+            "user_name": "lisi"
+        },
+        {
+            "tenant_id": "2",
+            "user_id": "3",
+            "user_name": "custer"
+        }
+    ],
+    "version": "0.4.1"
+}
+```
+
+如果
+
+```go
+func (this *UserController) UserList(ctx *gin.Context) goft.Json {
+	//return "select * from users"
+	ret := goft.SimpleQuery("select * from users").WithKey("result").Get() // map["result"]map[string]interface{}
+	return ret.(gin.H)["result"]
+}
+```
+
+返回结果
+
+```json
+[
+    {
+        "tenant_id": "1",
+        "user_id": "1",
+        "user_name": "shenyi"
+    },
+    {
+        "tenant_id": "2",
+        "user_id": "2",
+        "user_name": "lisi"
+    },
+    {
+        "tenant_id": "2",
+        "user_id": "3",
+        "user_name": "custer"
+    }
+]
+```
+
 代码变动 [git commit]()
 
 

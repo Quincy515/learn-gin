@@ -30,8 +30,10 @@ func (this *UserController) Build(goft *goft.Goft) {
 		Handle("GET", "/access_token", this.UserAccessToken)
 }
 
-func (this *UserController) UserList(ctx *gin.Context) goft.SimpleQuery {
-	return "select * from users"
+func (this *UserController) UserList(ctx *gin.Context) goft.Json {
+	//return "select * from users"
+	ret := goft.SimpleQuery("select * from users").WithKey("result").Get() // map["result"]map[string]interface{}
+	return ret.(gin.H)["result"]
 }
 
 func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
