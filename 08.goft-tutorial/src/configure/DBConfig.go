@@ -1,8 +1,8 @@
 package configure
 
 import (
-	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
+	"goft-tutorial/src/daos"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -48,20 +48,20 @@ func (this *DBConfig) GormDB() *gorm.DB {
 	return db
 }
 
-type XOrmAdapter struct {
-	*xorm.Engine
-}
+//type XOrmAdapter struct {
+//	*xorm.Engine
+//}
+//
+//func (this *XOrmAdapter) DB() *sql.DB {
+//	return this.Engine.DB().DB
+//}
 
-func (this *XOrmAdapter) DB() *sql.DB {
-	return this.Engine.DB().DB
-}
-
-func (this *DBConfig) XOrm() *XOrmAdapter {
+func (this *DBConfig) XOrm() *daos.XOrmAdapter {
 	engine, err := xorm.NewEngine("mysql", "root:root1234@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
 		log.Fatal(err)
 	}
 	engine.DB().SetMaxIdleConns(5)
 	engine.DB().SetMaxOpenConns(10)
-	return &XOrmAdapter{Engine: engine}
+	return &daos.XOrmAdapter{Engine: engine}
 }

@@ -21,3 +21,10 @@ func (this *UserService) GetUserDetail(param string) goft.Query {
 		return this.UserDao.GetUserByName(param)
 	}
 }
+
+func (this *UserService) UserLogin(uname string, uid int) string {
+	if this.UserDao.FindByUserName(uname).UserId == uid {
+		return "token" + uname
+	}
+	panic("error user access")
+}

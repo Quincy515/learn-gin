@@ -1040,5 +1040,105 @@ func (this *UserController) UserDetail(ctx *gin.Context) goft.Query {
 
 访问 localhost:8080/v1/user/2?token=1 看到 `{"userID":"2","userName":"lisi"}`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/ae545a8a44573b16145c3c70a602fdda5781fe54?branch=ae545a8a44573b16145c3c70a602fdda5781fe54&diff=split#diff-5e031c8fe909e21e054d942a61a9503aad9eed28cc4d7bd5718110d4a74cd23eL9)
+
+### 14. Service层示例：用户登录示例
+
+#### 第1步：Dao层 orm 注入
+
+```go
+package daos
+
+import (
+	"goft-tutorial/pkg/goft"
+	"goft-tutorial/src/models"
+)
+
+type UserDAO struct {
+	Db *XOrmAdapter `inject:"-"` // 依赖注入
+}
+
+func NewUserDAO() *UserDAO {
+	return &UserDAO{}
+}
+
+const getUserByID = `
+			SELECT 
+				user_id, user_name
+			FROM 
+				users
+			WHERE
+				user_id=?`
+
+// 简单的查询使用返回 goft.Query, 以 Get 开头
+func (this *UserDAO) GetUserByID(uid int) goft.Query {
+	return goft.SimpleQuery(getUserByID).
+		WithArgs(uid).WithFirst(). // WithArgs 返回包含对象的数组，WithFirst 直接返回第一个对象
+		WithMapping(map[string]string{
+			"user_id":   "userID",
+			"user_name": "userName",
+		})
+}
+
+// goft.Query 是给前端控制器使用的，一般不做为业务的控制
+func (this *UserDAO) GetUserByName(uname string) goft.Query {
+	return goft.SimpleQuery(`
+			SELECT 
+				user_id, user_name
+			FROM 
+				users
+			WHERE
+				user_name=?`).
+		WithArgs(uname).WithFirst()
+}
+
+// orm 操作的函数都是以 findBy 开头
+func (this *UserDAO) findByUserName(username string) *models.UserModel {
+	userModel := &models.UserModel{}
+	has, err := this.Db.Table("users").Where("user_name=?", username).Get(userModel)
+	if err != nil || !has {
+		panic("user not exists")
+	}
+	return userModel
+}
+```
+
+#### 第2步 service 层
+
+```go
+func (this *UserService) UserLogin(uname string, uid int) string {
+	if this.UserDao.FindByUserName(uname).UserId == uid {
+		return "token" + uname
+	}
+	panic("error user access")
+}
+```
+
+#### 第3步 controller 层
+
+```go
+func (this *UserController) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/users", this.UserList).
+		//HandleWithFairing("GET", "/user/:uid", this.UserDetail, middlewares.NewUserMiddleware())
+		Handle("GET", "/user/:uid", this.UserDetail).
+		Handle("GET", "/access_token", this.UserAccessToken)
+}
+
+// UserAccessToken 获取用户登录 token / access_token?uname=888&uid=***
+func (this *UserController) UserAccessToken(ctx *gin.Context) goft.Json {
+	if uname, uid := ctx.Query("uname"), ctx.Query("uid"); uname != "" && uid != "" {
+		id, _ := strconv.Atoi(uid)
+		return gin.H{"token": this.UserService.UserLogin(uname, id)}
+	}
+	panic("error user access params")
+}
+```
+
+访问 localhost:8080/v1/access_token?uname=custer&id=3 返回 `{"token":"tokencuster","version":"0.4.1"}`
+
 代码变动 [git commit]()
+
+
+
+
 
