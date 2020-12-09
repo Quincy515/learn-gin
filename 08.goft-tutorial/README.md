@@ -1214,9 +1214,85 @@ func (this *UserController) UserList(ctx *gin.Context) goft.Json {
 ]
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/af47ba446a525bb17a08f81357acf12810ab7527?branch=af47ba446a525bb17a08f81357acf12810ab7527&diff=split#diff-fe3b020a336c7e0ea80e1ee4f700c33695d0a78c695d938e5b309e99e559e621L30)
 
+### 16. 超简领域驱动模型入门(1)：基本分层
 
+#### 领域驱动模型DDD
 
+> 领域业务人员、产品或设计、程序员共同商定一个 **邻域模型**，
+>
+> 根据业务商定模型，使用通用语言进行描述，通过程序员实现具体代码。
 
+#### 失血模型
+
+领域模型(DM)          ------------------------------>             业务对象(BO)
+
+UserObject              ------------------------------>            1. queryUserList
+
+id int                         ------------------------------>             2. createUserList
+
+name string             ------------------------------>             3. findByUserID ...
+
+#### 充血模型
+
+领域模型(DM)          ------------------------------>             业务层
+
+UserObject              ------------------------------>             比如 UserLogin调用了UserQuery和Update                                          
+
+id int
+
+name string
+
+UserAdd()
+
+UserDel()
+
+UserQuery()
+
+UserUpdate()
+
+包括持久层的逻辑都定义在领域模型中。
+
+业务层主要调用模型层完成业务的组合调用和事务的封装。
+
+> 使用 DDD 一般利用充血模型来扩展不同的分层。
+
+#### 基本的分层(四层)
+
+- Infrastructure 基础实施层
+- domain 邻域层
+- application 应用层
+- interfaces 表示层，也叫用户界面层或接口层
+
+#### infrastructure 基础实施层
+
+与所有层进行交互
+
+- 自己写的业务工具类
+- 配置信息
+- 第三方库的集成和初始化
+- 数据持久化机制等
+
+所有层都可以调用基础实施层
+
+#### domain 领域层
+
+核心层，业务逻辑会在该层实现，比如包含
+
+- 实体
+- 值对象
+- 聚合
+- 工厂方法
+- Repository 仓储实例
+
+#### Application 应用层
+
+连接 domain 和 interfaces 层，
+
+对于 interface 层，提供各种业务功能方法，
+
+对于 domain 层，调用 domain 层完成任务逻辑
+
+> 对于业务代码简单使用传统三层比较合适，controller -> service -> dao
 
