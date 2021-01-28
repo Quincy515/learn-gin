@@ -2148,4 +2148,93 @@ func (u *UserResp) M2D_UserLogs(logs []*models.UserLogModel) (ret []*dto.UserLog
 }
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/7b959f64a182d5124d535f7e63878af3c449630e#diff-ca2c932473ba35ad272e7bdb266cf4e42706a4868533e83297297530dcc52b86R1)
+
+### 26. 应用层：应用服务层的基本用法、超简案例演示
+
+应用层中的 `Service` 起到的作用。
+
+主要职责：
+
+> 1. 向上：给 `interface` 层调用，提供各种功能
+> 2. 向下：调用领域
+>
+> 很薄的一层，没有业务逻辑，不应该存在 `if / else` 这种判断
+
+场景：
+
+根据 `ID` 获取用户详情，假设后面的 `uri` 是 `/users/123`
+
+（注意这里业务特别简单，只要取用户名和城市，没有任务业务逻辑）
+
+一共分几步
+
+1. 创建请求 `DTO`
+2. `DTO2Model` 的操作
+3. 调用并返回
+
+修改文件 `application/dto/UserDTO.go`
+
+```go
+package dto
+
+import "time"
+
+// 输入对象
+type (
+	SimpleUserReq struct {
+		Id int `uri:"id" binding:"required,min=100"`
+	}
+)
+
+// 以下是输出对象 
+type (
+	SimpleUserInfo struct {
+		Id   int    `json:"id"`
+		Name string `json:"name"`
+		City string `json:"city"`
+	}
+
+	UserLog struct {
+		Id   int       `json:"id"`
+		Log  string    `json:"log"`
+		Date time.Time `json:"date"`
+	}
+
+	UserInfo struct {
+		Id    int        `json:"id"`
+		Name  string     `json:"name"`
+		City  string     `json:"city"`
+		Phone string     `json:"phone"`
+		Logs  []*UserLog `json:"logs"`
+	}
+)
+```
+
+创建文件夹 `application/services/UserService.go`
+
+```go
+package services
+
+import (
+	"goft-tutorial/ddd/application/assembler"
+	"goft-tutorial/ddd/application/dto"
+	"goft-tutorial/ddd/domain/repos"
+)
+
+type UserService struct {
+	assUserReq *assembler.UserReq
+	assUserRsp *assembler.UserResp
+	userRepo   repos.IUserRepo
+}
+
+func (u *UserService) GetSimpleUserInfo(req *dto.SimpleUserReq) *dto.SimpleUserInfo {
+	userModel := u.assUserReq.D2M_UserModel(req)
+	if err := u.userRepo.FindById(userModel); err != nil {
+		return nil
+	}
+	return u.assUserRsp.M2D_SimpleUserInfo(userModel)
+}
+```
+
+其他代码变动查看 [git commit]()

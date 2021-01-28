@@ -4,7 +4,8 @@ import "goft-tutorial/ddd/domain/models"
 
 // IUserRepo 用户相关的仓储定义
 type IUserRepo interface {
-	FindByName(name string) *models.UserModel
+	FindById(*models.UserModel) error
+	FindByName(*models.UserModel) error
 	SaveUser(*models.UserModel) error
 	UpdateUser(*models.UserModel) error
 	DeleteUser(*models.UserModel) error

@@ -20,8 +20,10 @@ func NewMember(user *models.UserModel, userRepo repos.IUserRepo, userLogRepo rep
 }
 
 // NewMemberByName 用户名作为唯一标识的构造函数
-func NewMemberByName(name string, userRepo repos.IUserRepo, userLogRepo repos.IUserLogRepo) *Member {
-	user := userRepo.FindByName(name)
+func NewMemberByName(user *models.UserModel, userRepo repos.IUserRepo, userLogRepo repos.IUserLogRepo) *Member {
+	if err := userRepo.FindByName(user); err != nil {
+		return nil
+	}
 	return &Member{User: user, userRepo: userRepo, userLogRepo: userLogRepo}
 }
 
