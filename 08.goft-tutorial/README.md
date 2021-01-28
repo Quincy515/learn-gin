@@ -1645,4 +1645,92 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/0b7977145f49ec775a1ec29b39e050ca35d42724#diff-81722b802721838a9b9f9839d386df1dcacac70e832f94c9a03b95444b02bd31R1)
+
+### 19. 领域层:实体接口、聚合的概念
+
+#### 实体接口
+
+Go中没有抽象类，假如要实现抽象类，新建文件 `domain/models/IModel.go`
+
+```go
+package models
+
+import "fmt"
+
+// IModel 接口
+type IModel interface {
+	ToString() string // 方法
+}
+
+// Model 抽象类，所有都要主键和实体名称
+type Model struct {
+	Id   int    // 主键 - 判断实体实体之间是否相等
+	Name string // 实体名称
+}
+
+// SetName 对抽象类的设定
+func (m *Model) SetName(name string) {
+	m.Name = name
+}
+
+func (m *Model) SetId(id int) {
+	m.Id = id
+}
+
+func (m *Model) ToString() string {
+	return fmt.Sprintf("Entity is: %s, id is: %d", m.Name, m.Id)
+}
+```
+
+然后在 `domain/models/UserModel.go` 中嵌套抽象类 
+
+```go
+package models
+
+import (
+	"crypto/md5"
+	"fmt"
+	"goft-tutorial/ddd/domain/valueobjs"
+)
+
+type UserModel struct {
+	*Model
+	UserID   int                  `gorm:"column:user_id" json:"user_id"`
+	UserName string               `gorm:"column:user_name" json:"user_name"`
+	UserPwd  string               `gorm:"column:user_pwd" json:"user_pwd"`
+	Extra    *valueobjs.UserExtra // 值对象 - 通过属性指向用户的额外附加信息
+}
+
+// NewUserModel 构造函数
+func NewUserModel(attrs ...UserAttrFunc) *UserModel {
+	user := &UserModel{}
+	UserAttrFuncs(attrs).apply(user)
+	user.Model = &Model{}
+	user.SetId(user.UserID)
+	user.SetName("User Entity") // 用户实体名称
+	return user
+}
+
+func (UserModel) TableName() string {
+	return `user` //
+}
+
+func (u *UserModel) BeforeSave() {
+	u.UserPwd = fmt.Sprintf("%x", md5.Sum([]byte(u.UserPwd)))
+}
+```
+
+测试
+
+```go
+func main() {
+  user := NewUserModel(
+    WithUserID(101),
+    WithUserName("custer"),
+  )
+  fmt.Println(user.ToString())
+}
+```
+
 代码变动 [git commit]()
