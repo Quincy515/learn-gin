@@ -1896,4 +1896,55 @@ func (u *UserRepo) DeleteUser(*models.UserModel) error { return nil }
 
 `var _ repos.IUserRepo = &UserRepo{}`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e8f29bd19b99a4c48bf752aed5cd5033ab0928ca#diff-b37cd30fb81aba5a9c89250a01ac1971a9285e24144e4d716ebb05f2d30257b3R1)
+
+### 22. 领域层:聚合方法示例(用户为例)
+
+使用仓储的目的是为了专心写业务逻辑，不用考虑数据库相关的内容。
+
+用户持久化内容放在 `infrastructure` 的 `dao` 层处理。
+
+下面是会员聚合 `Member` 的根 `User *models.UserModel`
+
+```go
+package aggregates
+
+import (
+	"goft-tutorial/ddd/domain/models"
+	"goft-tutorial/ddd/domain/repos"
+)
+
+// Member 会员聚合 -- 会员：用户+日志+...组成
+type Member struct {
+	User *models.UserModel
+	Log  *models.UserLogModel
+	// 充值、社交、隐私信息
+	userRepo    repos.IUserRepo // 接口
+	userLogRepo repos.IUserLogRepo
+}
+
+// NewMember 构造函数
+func NewMember(user *models.UserModel, userRepo repos.IUserRepo, userLogRepo repos.IUserLogRepo) *Member {
+	return &Member{User: user, userRepo: userRepo, userLogRepo: userLogRepo}
+}
+
+// NewMemberByName 用户名作为唯一标识的构造函数
+func NewMemberByName(name string, userRepo repos.IUserRepo, userLogRepo repos.IUserLogRepo) *Member {
+	user := userRepo.FindByName(name)
+	return &Member{User: user, userRepo: userRepo, userLogRepo: userLogRepo}
+}
+
+// Create 创建会员
+func (m *Member) Create() error {
+	err := m.userRepo.SaveUser(m.User)
+	if err != nil {
+		return err
+	}
+	m.Log = models.NewUserLogModel(m.User.UserName,
+		models.WithUserLogType(models.UserLog_Create),
+		models.WithUserLogComment("新增用户会员: "+m.User.UserName))
+	return m.userLogRepo.SaveLog(m.Log)
+}
+```
+
 代码变动 [git commit]()
