@@ -1829,4 +1829,71 @@ type Member struct {
 
 这个就是操作会员的最小对象就是聚合。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/decedb842f9265d6134e31f639a8e32f880d3b48#diff-dcc2a04afbb61399c1da0f97aad06da74bb78c91e217c53f3700cbed1189b558R1)
+
+### 21. 领域层:仓储层(Repository)、基础设施层
+
+概念：
+
+> 为每一个聚合根对象(实体)创建一个仓储接口(定义)，并且不和底层数据库交互。
+>
+> 作用：更好的把精力集中在邻域逻辑上
+>
+> 具体实现放到 infrastructure 层 (基础设施层)
+
+新建仓储对象 `domain/repos/IUserRepo.go`
+
+```go
+package repos
+
+import "goft-tutorial/ddd/domain/models"
+
+type IUserRepo interface {
+	FindByName(name string) *models.UserModel
+	SaveUser(*models.UserModel) error
+	UpdateUser(*models.UserModel) error
+	DeleteUser(*models.UserModel) error
+}
+
+type IUserLogRepo interface {
+	FindByName(name string) *models.UserLogModel
+	SaveLog(model *models.UserLogModel) error
+}
+```
+
+接下来新建文件夹和文件 `ddd/infrastructure/dao/UserRepo.go` 写仓储对象的具体实现
+
+```go
+package dao
+
+import (
+	"goft-tutorial/ddd/domain/models"
+	"gorm.io/gorm"
+)
+
+type UserRepo struct {
+	DB *gorm.DB
+}
+
+func NewUserRepo() *UserRepo {
+	return &UserRepo{}
+}
+
+// FindByName 在这里实现具体业务操作
+func (u *UserRepo) FindByName(name string) *models.UserModel {
+	user := &models.UserModel{}
+	if u.DB.Where("user_name=?", name).Find(user).Error != nil {
+		return nil
+	}
+	return user
+}
+func (u *UserRepo) SaveUser(*models.UserModel) error   { return nil }
+func (u *UserRepo) UpdateUser(*models.UserModel) error { return nil }
+func (u *UserRepo) DeleteUser(*models.UserModel) error { return nil }
+```
+
+可以通过这种方法查看具体哪个方法没有实现
+
+`var _ repos.IUserRepo = &UserRepo{}`
+
 代码变动 [git commit]()
