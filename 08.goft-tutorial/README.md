@@ -1218,6 +1218,19 @@ func (this *UserController) UserList(ctx *gin.Context) goft.Json {
 
 ### 16. 超简领域驱动模型入门(1)：基本分层
 
+上面的业务实现是
+
+```bash
+Controller<--------------> Service层
+（定义路由、Service层的整合）     ↑
+                              |
+                              |
+                              ↓
+                             DAO层
+```
+
+传统的三层`Controller` `Service` `DAO` 设计简单，后期业务复杂，可维护性比较低。
+
 #### 领域驱动模型DDD
 
 > 领域业务人员、产品或设计、程序员共同商定一个 **邻域模型**，
@@ -1226,57 +1239,58 @@ func (this *UserController) UserList(ctx *gin.Context) goft.Json {
 
 #### 失血模型
 
-领域模型(DM)          ------------------------------>             业务对象(BO)
+```bash
+领域模型(DM)         ------------->             业务对象(BO)
 
-UserObject              ------------------------------>            1. queryUserList
-
-id int                         ------------------------------>             2. createUserList
-
-name string             ------------------------------>             3. findByUserID ...
+UserObject          ------------->          1. queryUserList
+id int              ------------->          2. createUserList
+name string         ------------->          3. findByUserID ...
+```
 
 #### 充血模型
 
-领域模型(DM)          ------------------------------>             业务层
+```bash
+领域模型(DM)                  业务层
 
-UserObject              ------------------------------>             比如 UserLogin调用了UserQuery和Update                                          
-
+UserObject                  比如 UserLogin调用了UserQuery和Update                                          
 id int
-
 name string
-
+                --------->  
 UserAdd()
-
 UserDel()
-
 UserQuery()
-
 UserUpdate()
+```
 
-包括持久层的逻辑都定义在领域模型中。
+> **包括持久层的逻辑都定义在领域模型中**。业务层主要调用模型层完成业务的组合调用和事务的封装。
 
-业务层主要调用模型层完成业务的组合调用和事务的封装。
-
-> 使用 DDD 一般利用充血模型来扩展不同的分层。
+> **使用 DDD 一般利用充血模型来扩展不同的分层。**
 
 #### 基本的分层(四层)
 
-- Infrastructure 基础实施层
-- domain 邻域层
-- application 应用层
-- interfaces 表示层，也叫用户界面层或接口层
+- `Infrastructure` 基础实施层
+- `domain` 邻域层
+- `application` 应用层
+- `interfaces` 表示层，也叫用户界面层或接口层(接收用户请求、获取参数、进行判断Controller层)
 
-#### infrastructure 基础实施层
+```bash
+Infrastructure -->  Interfaces
+               -->  Application
+               -->  Domain
+```
+
+#### `infrastructure` 基础实施层
 
 与所有层进行交互
 
-- 自己写的业务工具类
+- 自己写的业务工具类 
 - 配置信息
 - 第三方库的集成和初始化
 - 数据持久化机制等
 
 所有层都可以调用基础实施层
 
-#### domain 领域层
+#### `domain` 领域层
 
 核心层，业务逻辑会在该层实现，比如包含
 
@@ -1284,15 +1298,160 @@ UserUpdate()
 - 值对象
 - 聚合
 - 工厂方法
-- Repository 仓储实例
+- `Repository` 仓储实例
 
-#### Application 应用层
+#### `Application` 应用层
 
-连接 domain 和 interfaces 层，
+连接 `domain` 和 `interfaces` 层，
 
-对于 interface 层，提供各种业务功能方法，
+对于 `interface` 层，提供各种业务功能方法给（Controller层即interfaces），
 
-对于 domain 层，调用 domain 层完成任务逻辑
+对于 `domain` 层，调用 `domain` 层完成任务逻辑。
 
-> 对于业务代码简单使用传统三层比较合适，controller -> service -> dao
+> 对于业务代码简单使用传统三层比较合适，`controller` -> `service` -> `dao`
 
+### 17. 领域层:用户实体编写和值对象(初步)
+
+数据表
+
+```sql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for user
+-- ----------------------------
+DROP TABLE IF EXISTS `user`;
+CREATE TABLE `user` (
+  `user_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_name` varchar(255) DEFAULT NULL,
+  `user_pwd` varchar(255) DEFAULT NULL,
+  `user_phone` varchar(255) DEFAULT NULL,
+  `user_city` varchar(255) DEFAULT NULL,
+  `user_qq` varchar(255) DEFAULT NULL,
+  `user_addtime` datetime DEFAULT NULL,
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+#### `domain` 领域层
+
+核心层，业务逻辑会在该层实现，比如包含
+
+- 实体
+- 值对象
+- 聚合
+- 工厂方法
+- `Repository` 仓储实例
+
+之前的代码都在 `src` ，现在在根目录下创建新的文件夹 `ddd/domain`
+
+#### 实体
+
+创建实体文件 `models.go` 包含用户实体。
+
+```go
+package models
+
+import (
+	"time"
+)
+
+type UserModel struct {
+	UserID      int       `gorm:"column:user_id" json:"user_id"`
+	UserName    string    `gorm:"column:user_name" json:"user_name"`
+	UserPwd     string    `gorm:"column:user_pwd" json:"user_pwd"`
+	UserPhone   string    `gorm:"column:user_phone" json:"user_phone"`
+	UserCity    string    `gorm:"column:user_city" json:"user_city"`
+	UserQq      string    `gorm:"column:user_qq" json:"user_qq"`
+	UserAddtime time.Time `gorm:"column:user_addtime" json:"user_addtime"`
+}
+
+func (UserModel) TableName() string {
+	return `user` //
+}
+```
+
+实体第一要素，**要有唯一标识**
+
+这里要做几件事
+
+1. 定义用户实体 - 有唯一的标识（必须），包含各种属性，也可以包含如数据验证、操作前置函数，构造函数实例化等等
+2. 用户的值对象
+
+```go
+// 前置操作、保存密码之前需要加密
+func (u *UserModel) BeforeSave() { 
+	u.UserPwd = fmt.Sprintf("%x", md5.Sum([]byte(u.UserPwd)))
+}
+```
+
+#### 值对象
+
+```go
+type UserModel struct {
+	UserID   int        `gorm:"column:user_id" json:"user_id"`
+	UserName string     `gorm:"column:user_name" json:"user_name"`
+	UserPwd  string     `gorm:"column:user_pwd" json:"user_pwd"`
+	Extra    *UserExtra // 值对象 - 通过属性指向用户的额外附加信息
+}
+type UserExtra struct {
+	UserPhone string `gorm:"column:user_phone" json:"user_phone"`
+	UserCity  string `gorm:"column:user_city" json:"user_city"`
+	UserQq    string `gorm:"column:user_qq" json:"user_qq"`
+}
+```
+
+> 用来描述一个事物的特征，没有唯一标识的对象，譬如用户的 extra 信息
+
+有2个重要原则
+
+1. 实体只能通过 `ID`(唯一标识)来判断两者是否相同
+2. 而值对象。只需根据“值”就能判断两者是否相等
+
+不可变：修改值对象，必须传入新对象。
+
+```go
+func (u UserExtra) Equals(other *UserExtra) bool {
+	return u.UserPhone == other.UserPhone && u.UserQq == other.UserQq && u.UserCity == other.UserCity
+}
+```
+
+全部 `models.go`代码
+
+```go
+package models
+
+import (
+	"crypto/md5"
+	"fmt"
+)
+
+type UserModel struct {
+	UserID   int        `gorm:"column:user_id" json:"user_id"`
+	UserName string     `gorm:"column:user_name" json:"user_name"`
+	UserPwd  string     `gorm:"column:user_pwd" json:"user_pwd"`
+	Extra    *UserExtra // 值对象 - 通过属性指向用户的额外附加信息
+}
+type UserExtra struct {
+	UserPhone string `gorm:"column:user_phone" json:"user_phone"`
+	UserCity  string `gorm:"column:user_city" json:"user_city"`
+	UserQq    string `gorm:"column:user_qq" json:"user_qq"`
+}
+
+func (u UserExtra) Equals(other *UserExtra) bool {
+	return u.UserPhone == other.UserPhone && u.UserQq == other.UserQq && u.UserCity == other.UserCity
+}
+
+func (UserModel) TableName() string {
+	return `user` //
+}
+
+func (u *UserModel) BeforeSave() {
+	u.UserPwd = fmt.Sprintf("%x", md5.Sum([]byte(u.UserPwd)))
+}
+```
+
+代码变动 [git commit]()
