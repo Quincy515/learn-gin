@@ -1733,4 +1733,100 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/b827bb93a914e2aa41d76246b1670a801b5cfe06#diff-869c4d201f582c3c7624f25889b066d63cff28bbd6f9fd597a947915d3234617R1)
+
+#### 聚合
+
+```go
+我的好友功能               下单用户               用户日志
+   \                        |                   /
+    \                       |                  /
+     \                      |                 /
+                           用户
+
+库存             主订单             物流
+ \                |               /
+  \               |              /
+   \              |             /
+                 商品
+```
+
+概念：
+
+> 聚合包括一组邻域对象（包含实体和值对象），完整描述一个邻域业务，其中必然有个根实体，这个叫做聚合根。
+
+譬如上面的例子中：
+
+用户登录这个聚合，用户实体就是聚合根（包含了各个值对象）
+
+假设我们还有用户日志这个功能，其中用户日志包含了，用户登录日志、用户购买日志、用户充值日志。这 3 个的聚合，用户实体都是他们的聚合根。
+
+> 难点是如何划分聚合和聚合根，和处理聚合和实体之间的关系。
+
+### 20. 领域层:初步划分聚合（用户为例）
+
+新增用户日志实体文件 `domain/models/UserLogModel.go`
+
+```go
+package models
+
+import "time"
+
+// UserLogModel 用户日志实体
+type UserLogModel struct {
+	*Model
+	Id         int       `gorm:"column:id;primary_key;auto_increment" json:"id"`
+	UserName   string    `gorm:"column:user_name" json:"user_name"`
+	LogType    uint8     `gorm:"column:log_type" json:"log_type"`
+	LogComment uint8     `gorm:"column:log_comment" json:"log_comment"`
+	Updatetime time.Time `gorm:"column:update_time" json:"login_time"`
+}
+
+func NewUserLogModel(userName string, logType uint8, logComment uint8) *UserLogModel {
+	logModel := &UserLogModel{UserName: userName, LogType: logType, LogComment: logComment}
+	logModel.Model = &Model{}
+	logModel.SetId(logModel.Id)
+	logModel.SetName("用户日志实体")
+  return logModel
+}
+```
+
+说明：
+
+> 1、每个聚合都有一个根和一个边界
+>
+> 2、边界内定义了聚合的内部有什么
+>
+> 3、根则是聚合所包含的一个特定的实体
+>
+> 4、外部对象可以引用根，但不能引用聚合内部的其他对象
+>
+> 5、聚合内的对象之间可以相互引用
+
+```go
+           会员      |      订单 
+          聚合根   <--|--> 聚合根
+        /       \    |    /  \
+       实体     实体  |  实体  实体
+                /    |
+              值对象  |
+```
+
+聚合，新建文件夹 `domain/aggregates/Member.go` 用户是底层实体，会员是业务对象
+
+```go
+package aggregates
+
+import "goft-tutorial/ddd/domain/models"
+
+// Member 会员聚合 -- 会员：用户+日志+...组成
+type Member struct {
+	User *models.UserModel
+	Log  *models.UserLogModel
+	// 充值、社交、隐私信息
+}
+```
+
+这个就是操作会员的最小对象就是聚合。
+
 代码变动 [git commit]()

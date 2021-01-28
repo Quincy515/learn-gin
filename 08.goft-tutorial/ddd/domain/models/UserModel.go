@@ -6,6 +6,7 @@ import (
 	"goft-tutorial/ddd/domain/valueobjs"
 )
 
+// UserModel 用户实体
 type UserModel struct {
 	*Model
 	UserID   int                  `gorm:"column:user_id" json:"user_id"`
