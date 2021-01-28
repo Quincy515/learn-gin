@@ -2093,4 +2093,59 @@ type UserInfo struct {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/cb4180ff4e70345a807f02c5c2700117fa4adc2d#diff-618db5fbdee7f3ed051d219cb16e10a21d7a56ba593d212d3cf75216292063baR1)
+
+### 25. 应用层入门：DTO和实体的映射
+
+```go
+                   表示层(接口层)
+                        ↑
+                       DTO  ←--
+                              ↑                     
+              Service 应用层 DTO映射
+                 ↑            
+                 |←------------↑
+              聚合repo 领域层 聚合repo
+```
+
+**`Assembler` 装配**
+
+主要完成的是：
+
+> 完成领域对象和响应的 `DTO` 对象之间的类型转换、数据填充、多个领域对象的组装成一个 `DTO`
+
+```go
+package assemler
+
+import (
+	"goft-tutorial/ddd/application/dto"
+	"goft-tutorial/ddd/domain/aggregates"
+	"goft-tutorial/ddd/domain/models"
+)
+
+type UserResp struct {
+}
+
+// M2D_SimpleUserInfo 把用户实体映射为 简单用户 DTO
+func (u *UserResp) M2D_SimpleUserInfo(user *models.UserModel) *dto.SimpleUserInfo {
+	simpleUser := &dto.SimpleUserInfo{}
+	simpleUser.Id = user.UserID
+	simpleUser.Name = user.UserName
+	simpleUser.City = user.Extra.UserCity
+	return simpleUser
+}
+
+func (u *UserResp) M2D_UserInfo(mem *aggregates.Member) *dto.UserInfo {
+	userInfo := &dto.UserInfo{}
+	userInfo.Id = mem.User.UserID
+	///... 其他睡醒赋值
+	userInfo.Logs = u.M2D_UserLogs(mem.GetLogs())
+	return userInfo
+}
+
+func (u *UserResp) M2D_UserLogs(logs []*models.UserLogModel) (ret []*dto.UserLog) {
+	return
+}
+```
+
 代码变动 [git commit]()

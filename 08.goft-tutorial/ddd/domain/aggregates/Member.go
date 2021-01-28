@@ -36,3 +36,7 @@ func (m *Member) Create() error {
 		models.WithUserLogComment("新增用户会员: "+m.User.UserName))
 	return m.userLogRepo.SaveLog(m.Log)
 }
+
+func (m *Member) GetLogs() (ret []*models.UserLogModel) {
+	return
+}
