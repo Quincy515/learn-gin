@@ -1947,4 +1947,69 @@ func (m *Member) Create() error {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/68193685429066598c3890ab9bbf4e2d191b4931#diff-dcc2a04afbb61399c1da0f97aad06da74bb78c91e217c53f3700cbed1189b558L1)
+
+### 23. 领域层之:领域服务层的基本使用
+
+如果有比较复杂的用户登录操作，*不太适合*放在聚合或实体相关的进行操作，
+
+这时就需要使用领域服务层（Domain Service），**基本概念**：
+
+> 实现特定与某个领域的任务。
+>
+> 当某个操作不适合放在聚合（实体）或值对象上时，那么可以使用邻域服务层。
+
+**操作内容**：
+
+1. 操作多个聚合根(即实体)
+2. 也可以调用仓储层
+3. 代码可以相对灵活一些
+4. 命名一般要能直接描述出该代码业务的功能
+
+**举例**
+
+比如：把用户登录的过程写在服务里
+
+登录过程一般是：
+
+1. 根据用户和密码进行判断
+   1. 先判断用户是否存在，如果存在取出用户
+   2. 根据传过来的密码和库中的密码采用“相同策略”加密等方法判断
+2. 如果登录失败，记录系统日志
+3. 如果登录成功，记录登录日志
+4. 用户登录安全判断，比如IP是不是常用地等
+5. 根据用户登录次数，（比如连续登录几天）给积分奖励
+
+在文件 `domain` 下新建文件`domian/services/UserLoginService.go`
+
+```go
+package services
+
+import (
+	"fmt"
+	"goft-tutorial/ddd/domain/repos"
+	"goft-tutorial/ddd/infrastructure/utils"
+)
+
+type UserLoginService struct {
+	userRepo repos.IUserRepo
+}
+
+// UserLogin 复杂的用户登录逻辑
+func (u *UserLoginService) UserLogin(userName string, userPwd string) (string, error) {
+	user := u.userRepo.FindByName(userName)
+	if user.UserID > 0 { // 存在该用户
+		if user.UserPwd == utils.Md5(userPwd) {
+			// TODO：记录登录日志
+			return "1000200", nil
+		} else {
+			return "1000400", fmt.Errorf("密码不正确")
+		}
+	} else {
+		// 1000 代表用户，404代表不存在
+		return "1000404", fmt.Errorf("用户不存在")
+	}
+}
+```
+
 代码变动 [git commit]()
