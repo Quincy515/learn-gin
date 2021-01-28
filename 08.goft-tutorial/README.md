@@ -2012,4 +2012,85 @@ func (u *UserLoginService) UserLogin(userName string, userPwd string) (string, e
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/6e5d809f301c464260b2a56385d64bd8c23d913e#diff-0373a410edc856074a763e0d840729bef323dd979490545cd42d7ecdee5ff742R1)
+
+### 24. 应用层入门(Application):DTO数据传输对象
+
+#### `Application` 应用层
+
+作用：连接 `domain` 和 `interfaces` 层
+
+基本顺序：展现层(api)调用应用层，应用层调用领域层，领域层或调用基础设施层。
+
+#### DTO(Data Transfer Object)
+
+中文含义是数据传输对象。主要针对于展现层和应用层传输数据。
+
+那到底传输什么呢？
+
+最直观的理解就是 API 的输出格式
+
+```json
+{
+  "message": "xxx",
+  "result": "",
+  "code": "1000200"
+}
+```
+
+在应用层 `dto` 中定义输出格式，新建文件 `application/dto/MessageResult.go`
+
+```go
+package dto
+
+type MessageResult struct {
+	Result  interface{} `json:"result"`
+	Message string      `json:"message"`
+	Code    int         `json:"code"`
+}
+```
+
+输出给前端展示用户的简易信息，新建文件 `/application/dto/UserDTO.go`
+
+```go
+package dto
+
+type SimpleUserInfo struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
+	City string `json:"city"`
+}
+```
+
+第二个，假设要在前台显示两种用户信息
+
+1. 简易信息，只有用户名和ID、用户所在城市
+2. 复杂信息，显示的用户详细信息，和最近操作日志（个人中心首页常用）
+
+```go
+package dto
+
+import "time"
+
+type SimpleUserInfo struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
+	City string `json:"city"`
+}
+
+type UserLog struct {
+	Id   int       `json:"id"`
+	Log  string    `json:"log"`
+	Date time.Time `json:"date"`
+}
+
+type UserInfo struct {
+	Id    int        `json:"id"`
+	Name  string     `json:"name"`
+	City  string     `json:"city"`
+	Phone string     `json:"phone"`
+	Logs  []*UserLog `json:"logs"`
+}
+```
+
 代码变动 [git commit]()
