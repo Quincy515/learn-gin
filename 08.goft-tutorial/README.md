@@ -1454,4 +1454,195 @@ func (u *UserModel) BeforeSave() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/2ee88ba0d2189cba6625f99f257f77f78db55b8c#diff-d0ccff768dc2a505a59253d2196158bd03e8303e5437a2bde670fe6dbff39d47R1)
+
+### 18. 领域层:用户实体和值对象（2）--构造函数
+
+上面创建了用户实体和值对象。上面把所有代码都放在了 `domain/models.go` 文件中。
+
+这里修改下目录结构，新建文件夹 `domain/valueobjs` 和 `domain/models`。
+
+```go
+└── domain
+		├── models
+    │   └── UserModel.go
+    └── valueobjs
+        └── UserExtra.go
+```
+
+实体 `UserModel.go` 文件
+
+```go
+package models
+
+import (
+	"crypto/md5"
+	"fmt"
+	"goft-tutorial/ddd/domain/valueobjs"
+)
+
+type UserModel struct {
+	UserID   int                  `gorm:"column:user_id" json:"user_id"`
+	UserName string               `gorm:"column:user_name" json:"user_name"`
+	UserPwd  string               `gorm:"column:user_pwd" json:"user_pwd"`
+	Extra    *valueobjs.UserExtra // 值对象 - 通过属性指向用户的额外附加信息
+}
+
+func (UserModel) TableName() string {
+	return `user` //
+}
+
+func (u *UserModel) BeforeSave() {
+	u.UserPwd = fmt.Sprintf("%x", md5.Sum([]byte(u.UserPwd)))
+}
+```
+
+值对象 `UserExtra.go` 文件
+
+```go
+package valueobjs
+
+type UserExtra struct {
+	UserPhone string `gorm:"column:user_phone" json:"user_phone"`
+	UserCity  string `gorm:"column:user_city" json:"user_city"`
+	UserQq    string `gorm:"column:user_qq" json:"user_qq"`
+}
+
+func (u UserExtra) Equals(other *UserExtra) bool {
+	return u.UserPhone == other.UserPhone && u.UserQq == other.UserQq && u.UserCity == other.UserCity
+}
+```
+
+创建构造函数文件   `domain/models/UserAttrs.go`
+
+```go
+package models
+
+type UserAttrFunc func(model *UserModel) // 设置 User 属性的 函数类型
+type UserAttrFuncs []UserAttrFunc
+
+// 传参数
+func WithUserID(id int) UserAttrFunc {
+	return func(u *UserModel) {
+		u.UserID = id
+	}
+}
+
+func WithUserName(name string) UserAttrFunc {
+	return func(u *UserModel) {
+		u.UserName = name
+	}
+}
+
+func WithUserPass(pass string) UserAttrFunc {
+	return func(u *UserModel) {
+		u.UserPwd = pass
+	}
+}
+
+// apply 方法 循环 UserAttrFuncs 内容执行函数
+func (u UserAttrFuncs) apply(userModel *UserModel) {
+	for _, f := range u {
+		f(userModel)
+	}
+}
+```
+
+在 `domain/models/UserModel.go` 中实现构造函数
+
+```go
+// NewUserModel 构造函数
+func NewUserModel(attrs ...UserAttrFunc) *UserModel {
+	user := &UserModel{}
+	UserAttrFuncs(attrs).apply(user)
+	return user
+}
+```
+
+测试函数
+
+```go
+func main() {
+  user := models.NewUserModel(
+    models.WithUserName("custer"),
+  )
+  fmt.Println(user)
+}
+```
+
+这就是在邻域模型里面创建构造函数的推荐方式。
+
+同理在值对象中也新建构造函数的文件 `domain/valueobjs/UserExtraAttr.go`
+
+```go
+package valueobjs
+
+type UserExtraAttrFunc func(model *UserExtra) // 设置 User 属性的 函数类型
+type UserExtraAttrFuncs []UserExtraAttrFunc
+
+// 传参数
+func WithUserPhone(phone string) UserExtraAttrFunc {
+	return func(u *UserExtra) {
+		u.UserPhone = phone
+	}
+}
+
+func WithUserQQ(qq string) UserExtraAttrFunc {
+	return func(u *UserExtra) {
+		u.UserQq = qq
+	}
+}
+
+func WithUserCity(city string) UserExtraAttrFunc {
+	return func(u *UserExtra) {
+		u.UserCity = city
+	}
+}
+
+// apply 方法 循环 UserExtraAttrFuncs 内容执行函数
+func (u UserExtraAttrFuncs) apply(model *UserExtra) {
+	for _, f := range u {
+		f(model)
+	}
+}
+```
+
+在文件 `domain/valueobjs/UserExtra.go` 中实现构造函数
+
+```go
+func NewUserExtra(attrs ...UserExtraAttrFunc) *UserExtra {
+	extra := &UserExtra{}
+	UserExtraAttrFuncs(attrs).apply(extra)
+	return extra
+}
+```
+
+因为值对象不能直接传递，所以需要在 `domain/models/UserAttrs.go` 中修改代码
+
+```go
+func WithUserExtra(extra *valueobjs.UserExtra) UserAttrFunc {
+	return func(u *UserModel) {
+		u.Extra = extra
+	}
+}
+```
+
+测试函数
+
+```go
+func main() {
+  user := models.NewUserModel(
+    models.WithUserName("custer"),
+    models.WithUserExtra(
+      valueobjs.NewUserExtra(
+        valueobjs.WithUserQQ("qqq"),
+				valueobjs.WithUserQQ("上海"),
+      )
+    ),
+  )
+  fmt.Println(user)
+	fmt.Println(user.Extra)
+}
+```
+
 代码变动 [git commit]()
