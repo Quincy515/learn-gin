@@ -2237,4 +2237,5 @@ func (u *UserService) GetSimpleUserInfo(req *dto.SimpleUserReq) *dto.SimpleUserI
 }
 ```
 
-其他代码变动查看 [git commit]()
+其他代码变动查看 [git commit](https://github.com/custer-go/learn-gin/commit/b2ebf56d4d4f8ad7a9998f12fb394b8266feeb34#diff-7ead6e0899fa94226ac1309b8e1e5d9129412df58db6cfe71213d9ecfcf2230aR1)
+
