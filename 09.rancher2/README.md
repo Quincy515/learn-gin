@@ -618,5 +618,57 @@ Server: Docker Engine - Community
   Experimental:     false
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/b5d91e56aaabe7f449596045a8d80cc61e979581#diff-d9b46c18eb099b2ccb6ffd4d1c1301939fab3dee37a5f3e13ff937352719e94dR1)
 
+### 6. Go调用Docker API：启动容器
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
+	"log"
+)
+
+type Empty struct{}
+
+func main() {
+	cli, err := client.NewClient("tcp://192.168.172.2:2345", "v1.39", nil, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx := context.Background()
+	config := &container.Config{
+		WorkingDir: "/app",
+		ExposedPorts: map[nat.Port]struct{}{
+			"80/tcp": Empty{},
+		},
+		Image: "alpine:3.13",
+		Cmd:   []string{"./myserver"},
+	}
+	hostConfig := &container.HostConfig{
+		PortBindings: map[nat.Port][]nat.PortBinding{
+			"80/tcp": []nat.PortBinding{
+				nat.PortBinding{HostPort: "8080"}, //宿主机的端口
+			},
+		},
+		Binds: []string{"/home/custer/myweb:/app"},
+	}
+	ret, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil,"myweb")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = cli.ContainerStart(ctx, ret.ID, types.ContainerStartOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("容器启动成功,ID是:", ret.ID)
+}
+```
+
+代码变动 [git commit]()
