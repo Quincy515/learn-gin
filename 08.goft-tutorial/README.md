@@ -2239,3 +2239,92 @@ func (u *UserService) GetSimpleUserInfo(req *dto.SimpleUserReq) *dto.SimpleUserI
 
 其他代码变动查看 [git commit](https://github.com/custer-go/learn-gin/commit/b2ebf56d4d4f8ad7a9998f12fb394b8266feeb34#diff-7ead6e0899fa94226ac1309b8e1e5d9129412df58db6cfe71213d9ecfcf2230aR1)
 
+### 27. 代码落地(1):进入interface层 - 脚手架开始发挥作用
+
+领域层和应用层代码和外部框架没有任何关系。纯粹是解决业务，实体、聚合、值对象。
+
+现在已经完成了
+
+- `Infrastructure` 基础实施层
+- `domain` 邻域层
+- `application` 应用层
+
+下面来完成 
+
+- `interfaces` 表示层，也叫用户界面层或接口层(接收用户请求、获取参数、进行判断Controller层)
+
+> 一言以蔽之：就是处理 HTTP 请求和响应。
+
+响应的具体处理已经在 `application` 应用层完成了，这里只需要调用即可。
+
+严格的 `DDD` 即 `interfaces` 层只能调用 `application` 层，`application` 层只能调用 `domian` 层。
+
+`interfaces` 层就是 `gin` 中的 `gin.HandlerFunc` ，我们自己写的控制器，中间件、过滤器、和框架相关的其他封装都可以放到这一层。
+
+完成控制器第一步：新建文件 `ddd/interfaces/controllers/UserController.go`
+
+```go
+package controllers
+
+import (
+	"github.com/gin-gonic/gin"
+	"goft-tutorial/ddd/application/dto"
+	"goft-tutorial/ddd/application/services"
+	"goft-tutorial/pkg/goft"
+)
+
+type UserController struct {
+	UserSvr *services.UserService `inject:"-"`
+}
+
+// UserDetail GET /user/123
+func (u *UserController) UserDetail(ctx *gin.Context) goft.Json {
+	simpleUserReq := &dto.SimpleUserReq{}
+	ctx.ShouldBindUri(simpleUserReq)
+	return u.UserSvr.GetSimpleUserInfo(simpleUserReq)
+}
+
+func (u *UserController) Build(goft *goft.Goft) {
+	goft.Handle("GET", "/users/:id", u.UserDetail)
+}
+
+func (u *UserController) Name() string {
+	return "UserController"
+}
+```
+
+### 28. interface层:异常的处理的方法
+
+在基础设施层新建通过错误处理 `ddd/infrastructure/utils/ErrorBinding.go`
+
+```go
+package utils
+
+type ErrorResult struct {
+	data interface{}
+	err  error
+}
+
+func NewErrorResult(data interface{}, err error) *ErrorResult {
+	return &ErrorResult{data: data, err: err}
+}
+
+// Unwrap 有错误 panic 没有错误就返回 data
+func (e *ErrorResult) Unwrap() interface{} {
+	if e.err != nil {
+		panic(e.err.Error())
+	}
+	return e.data
+}
+
+type BindFunc func(v interface{}) error
+
+// Exec 统一处理 gin 里 shouldBuild 的 error
+func Exec(f BindFunc, value interface{}) *ErrorResult {
+	err := f(value)
+	return NewErrorResult(value, err)
+}
+```
+
+这样在 `controller` 层，就可以不用 `if / else` 判断。
+
