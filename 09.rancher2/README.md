@@ -473,7 +473,150 @@ func main() {
 
 运行 `go run build.go` 这样就可以通过 `ssh` 编译容器。
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/ae9930ea466046a01701f1af96e7c9778bff907c#diff-3d390161cc978954fc3a4e858bce12ad7e05cd1d90a2416b8f916745fa894a69L6)
 
 ### 5. 使用Go调用Docker API
+
+上面完成了业务代码的上传和程序自动调用 `ssh` 在容器中进行编译打包镜像。
+
+在云服务器上运行 `docker ps` 是查看本机的 `docker` 服务，
+
+如果在另外一台云服务器，想要查看这台的 `docker` 服务，默认是不可以的。
+
+首先 `docker` 开放 `tcp` 连接，对于 `centos7` 文件在 
+
+`/usr/lib/systemd/system/docker.service`
+
+**1.打开编辑**：
+
+```bash
+sudo vi /usr/lib/systemd/system/docker.service
+```
+
+**2.注释原有的：**
+
+```bash
+ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+```
+
+**3.添加新的：**
+
+```bash
+ExecStart=/usr/bin/dockerd -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2345
+```
+
+ -H代表指定docker的监听方式，这里是socket文件文件位置，也就是socket方式，2345就是tcp端口
+
+**4.保存并退出**
+
+**5.重新加载系统服务配置文件（包含刚刚修改的文件）**
+
+```bash
+systemctl daemon-reload
+```
+
+**6.重启docker服务**
+
+```bash
+systemctl restart docker
+```
+
+**7.查看端口是否被docker监听**
+
+```bash  
+ss -tnl | grep 2345
+```
+
+**8.在内部系统上测试端口是否可以使用**
+
+```bash
+[custer@localhost ~]$ docker -H tcp://localhost:2345 ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+[custer@localhost ~]$ docker -H tcp://localhost:2346 ps
+Cannot connect to the Docker daemon at tcp://localhost:2346. Is the docker daemon running?
+```
+
+**8.查看防火墙是否开放2375端口**
+
+```bash  
+sudo firewall-cmd --zone=public --query-port=2345/tcp
+```
+
+**9.防火墙添加开放2375端口** 
+
+```bash  
+sudo firewall-cmd --zone=public --add-port=2345/tcp --permanent
+```
+
+**10.重启防火墙** 
+
+ ```bash 
+sudo firewall-cmd --reload
+ ```
+
+**11.在外部系统上测试端口是否可以使用**
+
+```bash  
+telnet 192.168.172.2 2345
+```
+
+使用 `docker` `sdk` 的官方文档 https://docs.docker.com/engine/api/sdk/
+
+```bash
+go get github.com/docker/docker/client
+```
+
+新建文件 `docker.go` 文件
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
+	"log"
+)
+
+func main() {
+	cli, err := client.NewClient("tcp://192.168.172.2:2345", "v1.39", nil, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, image := range images {
+		fmt.Println(image.ID, image.Labels)
+	}
+}
+```
+
+注意这里的  `version` 需要查看云服务器的 `docker` 版本
+
+```bash
+[custer@localhost ~]$ docker version
+Client:
+ Version:           18.09.9
+ API version:       1.39
+ Go version:        go1.11.13
+ Git commit:        039a7df9ba
+ Built:             Wed Sep  4 16:51:21 2019
+ OS/Arch:           linux/amd64
+ Experimental:      false
+
+Server: Docker Engine - Community
+ Engine:
+  Version:          18.09.9
+  API version:      1.39 (minimum version 1.12)
+  Go version:       go1.11.13
+  Git commit:       039a7df
+  Built:            Wed Sep  4 16:22:32 2019
+  OS/Arch:          linux/amd64
+  Experimental:     false
+```
+
+代码变动 [git commit]()
 
