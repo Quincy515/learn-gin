@@ -356,9 +356,11 @@ go build -o ../myserver main.go
 
 首先下载纯净的 `Alpine` 镜像 https://hub.docker.com/_/alpine
 
-选择上面对应的编译版本，比如 3.12 版本 `docker pull alpine:3.12`
+选择上面对应的编译版本，比如 3.13 版本 `docker pull alpine:3.13`
 
 这个 `alpine` 镜像是用来运行的，`docker images` 查看大小只有 5MB
+
+所以 `Go` 官方镜像用来编译，`alpine` 镜像用来运行程序。
 
 程序发布
 
@@ -366,14 +368,112 @@ go build -o ../myserver main.go
 docker run --name myweb -d \
 -v /home/custer/myweb:/app \
 -w /app \
--p 80:80 \
-alpine:3.12 \
+-p 80:8080 \
+alpine:3.13 \
 ./myserver
 ```
+
+`./myserver` 是启动容器后立即运行的程序。因为 `myserver` 是在目录 `/home/custer/myweb` 下，而这个目录又映射到了容器里的 `app` 目录，而当前容器工作目录也是 `app`，所以可以直接运行 `./myserver`。
 
 停止和删除服务
 
 `docker stop myweb && docker rm myweb`
+
+新建文件 `tool/scripts/build_script.go`
+
+```go
+package scripts
+
+const BuildScript = `
+docker run --rm \
+-v /home/custer/myweb:/app \
+-v /home/custer/gopath:/go \
+-w /app/src \
+-e GOPROXY=https://goproxy.cn \
+golang:1.15.7-alpine3.13 \
+go build -o ../myserver main.go
+`
+```
+
+这样就可以删除云服务器上的 `build.sh` 脚本 `rm build.sh`
+
+在 `Goland` 中也可以排除掉 `tool` 文件夹
+
+```go
+Goland 点击 Tools → Deployment → Configuration → Excluded Paths → Add Local Path
+```
+
+这样就可以修改 `build.go` 中的代码
+
+```go
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"golang.org/x/crypto/ssh"
+	"log"
+	"net"
+	"rancher2/tool/scripts"
+	"time"
+)
+
+func SSHConnect(user, password, host string, port int) (*ssh.Session, error) {
+	var (
+		auth         []ssh.AuthMethod
+		addr         string
+		clientConfig *ssh.ClientConfig
+		client       *ssh.Client
+		session      *ssh.Session
+		err          error
+	)
+	// get auth method
+	auth = make([]ssh.AuthMethod, 0)
+	auth = append(auth, ssh.Password(password))
+	hostKeyCallback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		return nil
+	}
+	clientConfig = &ssh.ClientConfig{
+		User:            user,
+		Auth:            auth,
+		Timeout:         30 * time.Second,
+		HostKeyCallback: hostKeyCallback,
+	}
+	// connect to ssh
+	addr = fmt.Sprintf("%s:%d", host, port)
+	if client, err = ssh.Dial("tcp", addr, clientConfig); err != nil {
+		return nil, err
+	}
+	if session, err = client.NewSession(); err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+func main() {
+	//build_script := "sh /home/custer/myweb/build.sh"
+	var stdOut, stdErr bytes.Buffer
+	session, err := SSHConnect("custer", "root1234", "192.168.172.2", 22)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer session.Close()
+	session.Stdout = &stdOut
+	session.Stderr = &stdErr
+	err = session.Run(scripts.BuildScript)
+	log.Println(stdOut.String())
+	log.Println(stdErr.String())
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+其实这个 `build.go` 可以做成带参数的命令行工具。
+
+运行 `go run build.go` 这样就可以通过 `ssh` 编译容器。
+
+代码变动 [git commit]()
 
 ### 5. 使用Go调用Docker API
 

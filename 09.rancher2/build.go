@@ -6,6 +6,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"log"
 	"net"
+	"rancher2/tool/scripts"
 	"time"
 )
 
@@ -42,7 +43,7 @@ func SSHConnect(user, password, host string, port int) (*ssh.Session, error) {
 }
 
 func main() {
-	build_script := "sh /home/custer/myweb/build.sh"
+	//build_script := "sh /home/custer/myweb/build.sh"
 	var stdOut, stdErr bytes.Buffer
 	session, err := SSHConnect("custer", "root1234", "192.168.172.2", 22)
 	if err != nil {
@@ -51,7 +52,7 @@ func main() {
 	defer session.Close()
 	session.Stdout = &stdOut
 	session.Stderr = &stdErr
-	err = session.Run(build_script)
+	err = session.Run(scripts.BuildScript)
 	log.Println(stdOut.String())
 	log.Println(stdErr.String())
 	if err != nil {
