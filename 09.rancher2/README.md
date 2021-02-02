@@ -1,5 +1,7 @@
 Rancher2+k8s无脑上手 https://www.jtthink.com/course/play/2757
 
+[toc]
+
 ### 1. 部署第一个程序
 
 1. 简单部署
@@ -166,7 +168,7 @@ docker pull golang:1.15.7-alpine3.13
 
 #### 3. 运行编译容器
 
-```bash
+```dockerfile
 docker run --rm -it \
 -v /home/custer/myweb:/app \
 -w /app/src \
@@ -218,7 +220,7 @@ rm myserver
 
 运行加入禁用 `CGO` 环境变量的编译容器
 
-```bash
+```dockerfile
 docker run --rm -it \
 -v /home/custer/myweb:/app \
 -w /app/src \
@@ -244,7 +246,7 @@ docker run --rm -it golang:1.15.7-alpine3.13 go env
 
 在云服务器中创建 `gopath` 文件夹，映射到容器中，每次 `go build` 就不会拉取第三方库了。
 
-```bash
+```dockerfile
 docker run --rm -it \
 -v /home/custer/myweb:/app \
 -v /home/custer/gopath:/go \
@@ -337,7 +339,7 @@ func main() {
 
 在云服务器中新建文件 `/home/custer/myweb/build.sh`
 
-```sh
+```dockerfile
 docker run --rm \
 -v /home/custer/myweb:/app \
 -v /home/custer/gopath:/go \
@@ -364,7 +366,7 @@ go build -o ../myserver main.go
 
 程序发布
 
-```sh
+```dockerfile
 docker run --name myweb -d \
 -v /home/custer/myweb:/app \
 -w /app \
@@ -671,4 +673,81 @@ func main() {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e901582fa76d4b2bb886495e1542c2de6c85710a#diff-d9b46c18eb099b2ccb6ffd4d1c1301939fab3dee37a5f3e13ff937352719e94dL4)
+
+### 7. NGINX反代Go API
+
+一般网站的架构会有 nginx 代理 80端口，映射到 api 服务 8080 或 8081。
+
+首先 nginx 容器 https://hub.docker.com/_/nginx 使用 alpine 版本
+
+```bash
+docker pull nginx:1.19.6-alpine
+```
+
+通过文档可以得知，其配置文件在 
+
+```bash
+/etc/nginx/nginx.conf
+```
+
+默认 HTML 目录在 
+
+```bash
+/usr/share/nginx/html
+```
+
+配置文件工具，可以自动生成 https://www.digitalocean.com/community/tools/nginx
+
+这里还有个https://it.baiked.com/tools/nginxconfig.html
+
+启动容器(先启动 go api)
+
+```dockerfile
+docker run --name myweb -d \
+-v /home/custer/myweb:/app \
+-w /app \
+alpine:3.13 \
+./myserver
+```
+
+注意：不需要映射端口，也就是浏览器永远无法直接访问 `myweb`，必须通过 `nginx`，所以这里不需要端口的映射。但是容器和容器之间是可以访问的。
+
+```bash
+docker inspect myweb
+
+可以看到 
+"IPAddress": "172.17.0.2",
+```
+
+找到这个 ip 地址，等下需要使用。
+
+<img src="../imgs/33.nginx.jpg" style="zoom:150%;" />
+
+在云服务器根目录创建文件夹 
+
+```bash
+cd && mkdir webconfig && cd webconfig && vi nginx.conf
+```
+
+并把自动生成的配置文件复制粘贴
+
+启动 nginx 容器
+
+```dockerfile
+docker run --name nginx -d \
+-v /home/custer/webconfig/nginx.conf:/etc/nginx/nginx.conf \
+-p 80:80 \
+nginx:1.19.6-alpine
+```
+
+查看日志 
+
+```bash
+docker logs nginx
+```
+
 代码变动 [git commit]()
+
+
+
