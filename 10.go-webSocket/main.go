@@ -2,9 +2,10 @@ package main
 
 import (
 	"github.com/gorilla/websocket"
+	"learn-websocket/src/core"
+	"learn-websocket/src/handlers"
 	"log"
 	"net/http"
-	"time"
 )
 
 var upgrader = websocket.Upgrader{
@@ -14,16 +15,15 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
-	http.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
-		client, _ := upgrader.Upgrade(w, r, nil) // 升级
-		for {
-			err := client.WriteMessage(websocket.TextMessage, []byte("hello"))
-			if err != nil {
-				log.Println(err)
-			}
-			time.Sleep(time.Second * 2)
-		}
+	http.HandleFunc("/echo", handlers.Echo)
+
+	http.HandleFunc("/sendall", func(w http.ResponseWriter, req *http.Request) {
+		msg:=req.URL.Query().Get("msg")
+		core.ClientMap.SendAll(msg)
+		w.Write([]byte("OK"))
 	})
+
+
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatal(err)
