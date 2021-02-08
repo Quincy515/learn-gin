@@ -11,6 +11,6 @@ func Echo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println()
 	} else {
-		core.ClientMap.Store(client.RemoteAddr().String(), client)
+		core.ClientMap.Store(client)
 	}
 }

@@ -20,6 +20,9 @@
         ws.send("i am user-a"); //将消息发送到服务端
     }
     ws.onmessage = function (e) {
+        if(e.data==='ping'){
+            return
+        }
         //当客户端收到服务端发来的消息时，触发onmessage事件，参数e.data包含server传递过来的数据
         let html = document.getElementById("message").innerHTML;
 

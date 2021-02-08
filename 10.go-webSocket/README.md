@@ -322,5 +322,129 @@ func (c *ClientMapStruct) SendAll(msg string) {
 
 在 `Goland` 中右键点击运行 `a.html`，打开 rest 工具，请求 http://localhost:8080/sendall?msg=abc，可以看到所有 `a.html` 客户端接收到 `服务端消息:abc`
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/5318e25ec46b8d1b7f419c7537f5693407e2e122?branch=5318e25ec46b8d1b7f419c7537f5693407e2e122&diff=split#diff-f05c20371760668299b744a5d25fd5e4c2e3c7fb1621bec98c95a759672fa6e7L2)
 
+### 03. 简易封装Client对象、Ping客户端
+
+```go
+type ClientMapStruct struct {
+	data sync.Map // key 是客户端 IP  Value 就是 WebSocket 连接对象
+}
+```
+
+这样在后面做一些扩展，可能就不是很方便，首先新建文件 `src/core/WsClient.go` ，做封装为了后面扩展方法方便。
+
+```go
+package core
+
+import (
+	"github.com/gorilla/websocket"
+	"time"
+)
+
+type WsClient struct {
+	conn *websocket.Conn
+}
+
+func NewWsClient(conn *websocket.Conn) *WsClient {
+	return &WsClient{conn: conn}
+}
+
+func (w *WsClient) Ping(waittime time.Duration) {
+	for {
+		time.Sleep(waittime)
+		err := w.conn.WriteMessage(websocket.TextMessage, []byte("ping"))
+		if err != nil {
+			ClientMap.Remove(w.conn)
+			return
+		}
+	}
+}
+```
+
+增加 `ClientMap.Remove` 方法
+
+```go
+package core
+
+import (
+	"github.com/gorilla/websocket"
+	"log"
+	"sync"
+	"time"
+)
+
+// ClientMap 外部公共使用
+var ClientMap *ClientMapStruct
+
+func init() {
+	ClientMap = &ClientMapStruct{}
+}
+
+type ClientMapStruct struct {
+	data sync.Map // key 是客户端 IP  Value 就是 WebSocket 连接对象
+}
+
+func (c *ClientMapStruct) Store(conn *websocket.Conn) {
+	wsClient := NewWsClient(conn)
+	c.data.Store(conn.RemoteAddr().String(), wsClient)
+	go wsClient.Ping(time.Second * 1)
+}
+
+// SendAll 向所有客户端 发送消息
+func (c *ClientMapStruct) SendAll(msg string) {
+	c.data.Range(func(key, value interface{}) bool {
+		err := value.(*WsClient).conn.WriteMessage(websocket.TextMessage, []byte(msg))
+		if err != nil {
+			log.Println(err)
+		}
+		return true
+	})
+}
+
+// Remove
+func (c *ClientMapStruct) Remove(conn *websocket.Conn) {
+	c.data.Delete(conn.RemoteAddr().String())
+}
+```
+
+修改 `src/handlers/Echo.go`
+
+```go
+package handlers
+
+import (
+	"learn-websocket/src/core"
+	"log"
+	"net/http"
+)
+
+func Echo(w http.ResponseWriter, r *http.Request) {
+	client, err := core.Upgrader.Upgrade(w, r, nil) // 升级
+	if err != nil {
+		log.Println()
+	} else {
+		core.ClientMap.Store(client)
+	}
+}
+```
+
+修改前端不显示 `ping` 消息
+
+```html
+    ws.onmessage = function (e) {
+        if(e.data==='ping'){
+            return
+        }
+        //当客户端收到服务端发来的消息时，触发onmessage事件，参数e.data包含server传递过来的数据
+        let html = document.getElementById("message").innerHTML;
+
+        html += '<p>服务端消息:' + e.data + '</p>'
+        document.getElementById("message").innerHTML = html
+    }
+```
+
+这样就可以尽可能的保持 `ClientMap` 里面 `data` 里面存储的客户端尽可能有效，毕竟有 `ping` 的等待时间。
+
+代表变动 [git commit]()
 
