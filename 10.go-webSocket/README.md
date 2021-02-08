@@ -446,5 +446,56 @@ func Echo(w http.ResponseWriter, r *http.Request) {
 
 这样就可以尽可能的保持 `ClientMap` 里面 `data` 里面存储的客户端尽可能有效，毕竟有 `ping` 的等待时间。
 
-代表变动 [git commit]()
+代表变动 [git commit](https://github.com/custer-go/learn-gin/commit/b763cc228057e049d054df6c615d0716fed8d04e?branch=b763cc228057e049d054df6c615d0716fed8d04e&diff=split#diff-29ed2b750da16e3e8bead96ec1397ab459c8ebe790c335fc8efee93fbfe5491dL4)
+
+### 04. 简单整合vue、发送JSON数据
+
+新增文件 `src/models/PodModel.go`
+
+```go
+package models
+
+type PodModel struct {
+	PodName  string
+	PodImage string
+	PodNode  string
+}
+
+func MockPodList() []*PodModel {
+	return []*PodModel{
+		{PodName: "pod-101", PodImage: "nginx:1.18", PodNode: "node1"},
+		{PodName: "pod-76xs", PodImage: "alpine:3.12", PodNode: "node2"},
+		{PodName: "pod-F#ff3", PodImage: "tomcat:8", PodNode: "node3"},
+	}
+}
+```
+
+修改 `src/core/ClientMap.go`
+
+```go
+// SendAll 向所有客户端 发送消息
+func (c *ClientMapStruct) SendAllPods() {
+	c.data.Range(func(key, value interface{}) bool {
+		conn := value.(*WsClient).conn
+		//err := c.WriteMessage(websocket.TextMessage, []byte(msg))
+		err := conn.WriteJSON(models.MockPodList())
+		if err != nil {
+			c.Remove(conn)
+			log.Println(err)
+		}
+		return true
+	})
+}
+```
+
+修改 `main.go`
+
+```go
+	http.HandleFunc("/sendall", func(w http.ResponseWriter, req *http.Request) {
+		core.ClientMap.SendAllPods()
+		w.Write([]byte("OK"))
+	})
+```
+
+
 

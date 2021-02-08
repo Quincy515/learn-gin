@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/gorilla/websocket"
+	"learn-websocket/src/models"
 	"log"
 	"sync"
 	"time"
@@ -25,10 +26,13 @@ func (c *ClientMapStruct) Store(conn *websocket.Conn) {
 }
 
 // SendAll 向所有客户端 发送消息
-func (c *ClientMapStruct) SendAll(msg string) {
+func (c *ClientMapStruct) SendAllPods() {
 	c.data.Range(func(key, value interface{}) bool {
-		err := value.(*WsClient).conn.WriteMessage(websocket.TextMessage, []byte(msg))
+		conn := value.(*WsClient).conn
+		//err := c.WriteMessage(websocket.TextMessage, []byte(msg))
+		err := conn.WriteJSON(models.MockPodList())
 		if err != nil {
+			c.Remove(conn)
 			log.Println(err)
 		}
 		return true

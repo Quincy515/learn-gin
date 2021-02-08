@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="0" http-equiv="Expires"/>
+    <meta content="no-cache" http-equiv="Pragma"/>
+    <meta content="no-cache" http-equiv="Cache-control"/>
+    <meta content="no-cache" http-equiv="Cache"/>
+    <title>Vue演示</title>
+    <script src="core/vue.js"></script>
+    <script src="core/vueloader.js"></script>
+    <script src="core/vuerouter.js"></script>
+    <script src="core/ws.js"></script>
+    <!-- 引入样式 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <!-- 引入组件库 -->
+    <script src="core/element.js"></script>
+</head>
+<body>
+ <div id="app">
+
+     <router-view></router-view>
+ </div>
+ <script type="module">
+     import router from "./core/router.js?v=1"
+     new Vue({
+         el: '#app',
+         router
+     })
+ </script>
+</body>
+</html>
