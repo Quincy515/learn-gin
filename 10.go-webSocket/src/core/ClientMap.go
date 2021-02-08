@@ -23,6 +23,8 @@ func (c *ClientMapStruct) Store(conn *websocket.Conn) {
 	wsClient := NewWsClient(conn)
 	c.data.Store(conn.RemoteAddr().String(), wsClient)
 	go wsClient.Ping(time.Second * 1)
+	go wsClient.ReadLoop()    //处理读 循环
+	go wsClient.HandlerLoop() //处理 总控制循环
 }
 
 // SendAll 向所有客户端 发送消息

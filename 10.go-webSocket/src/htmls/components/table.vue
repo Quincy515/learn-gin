@@ -1,5 +1,8 @@
 <template>
     <div>
+        <p>
+            <el-button @click="testSend">测试发送</el-button>
+        </p>
       <div style="width: 95%;margin: 0 auto">
         <div style="width: 95%;margin:30px auto">
             <el-table
@@ -33,16 +36,24 @@
        data(){
            return {
                podList: [],
+                client:null,
            }
        },
        created(){
-            NewClient().onmessage=(e)=>{
+           this.client=NewClient()
+           this.client.onmessage=(e)=>{
                 if(e.data !== 'ping'){
                     this.podList = JSON.parse(e.data)
                     this.$forceUpdate()
                 }
             }
        },
+       methods:{
+           testSend(){
+               this.client.send("test abc")
+           }
+       }
+
 
 
    }

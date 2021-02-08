@@ -497,5 +497,111 @@ func (c *ClientMapStruct) SendAllPods() {
 	})
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e318bc498833bb4903b40c170f4f1074dd33ed20?branch=e318bc498833bb4903b40c170f4f1074dd33ed20&diff=split#diff-f05c20371760668299b744a5d25fd5e4c2e3c7fb1621bec98c95a759672fa6e7L18)
 
+### 05. 封装读数据chan的基本套路 
+
+上面的代码
+
+```go
+func Echo(w http.ResponseWriter, r *http.Request) {
+	client, err := core.Upgrader.Upgrade(w, r, nil) // 升级
+	if err != nil {
+		log.Println()
+	} else {
+		core.ClientMap.Store(client)
+	}
+}
+```
+
+把相关客户端对象保存到 map 里面，如果客户端向服务端发送数据，读取，应该在哪里读取数据？
+
+封装读数据 chan 的基本套路，首先封装一个消息对象 ，新建文件 `src/core/WsMessage.go`
+
+```go
+package core
+
+type WsMessage struct {
+	MessageType int
+	MessageData []byte
+}
+
+func NewWsMessage(messageType int, messageData []byte) *WsMessage {
+	return &WsMessage{MessageType: messageType, MessageData: messageData}
+}
+```
+
+处理读循环 `src/core/ClientMap.go`
+
+```go
+func (c *ClientMapStruct) Store(conn *websocket.Conn) {
+	wsClient := NewWsClient(conn)
+	c.data.Store(conn.RemoteAddr().String(), wsClient)
+	go wsClient.Ping(time.Second * 1)
+	go wsClient.ReadLoop()    //处理读 循环
+	go wsClient.HandlerLoop() //处理 总控制循环
+}
+```
+
+修改代码 `src/core/WsClient.go`
+
+```go
+package core
+
+import (
+	"fmt"
+	"github.com/gorilla/websocket"
+	"log"
+	"time"
+)
+
+type WsClient struct {
+	conn      *websocket.Conn
+	readChan  chan *WsMessage //读队列 (chan)
+	closeChan chan byte       // 失败队列
+}
+
+func NewWsClient(conn *websocket.Conn) *WsClient {
+	return &WsClient{conn: conn, readChan: make(chan *WsMessage), closeChan: make(chan byte)}
+}
+
+func (w *WsClient) Ping(waittime time.Duration) {
+	for {
+		time.Sleep(waittime)
+		err := w.conn.WriteMessage(websocket.TextMessage, []byte("ping"))
+		if err != nil {
+			ClientMap.Remove(w.conn)
+			return
+		}
+	}
+}
+
+func (w *WsClient) ReadLoop() {
+	for {
+		t, data, err := w.conn.ReadMessage()
+		if err != nil {
+			w.conn.Close()
+			ClientMap.Remove(w.conn)
+			w.closeChan <- 1
+			break
+		}
+		w.readChan <- NewWsMessage(t, data)
+	}
+}
+
+func (w *WsClient) HandlerLoop() {
+loop:
+	for {
+		select {
+		case msg := <-w.readChan:
+			fmt.Println(string(msg.MessageData))
+		case <-w.closeChan:
+			log.Println("已经关闭")
+			break loop
+		}
+	}
+}
+```
+
+代码变动 [git commit]()
 
