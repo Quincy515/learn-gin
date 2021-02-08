@@ -2328,3 +2328,138 @@ func Exec(f BindFunc, value interface{}) *ErrorResult {
 
 这样在 `controller` 层，就可以不用 `if / else` 判断。
 
+### 29. 引入GORM、仓储层取值
+
+使用 `gorm`
+
+```shell
+go get -u gorm.io/gorm
+go get -u gorm.io/driver/mysql
+```
+
+新建文件 `ddd/interfaces/configs/DBConfig.go`
+
+```go
+package configs
+
+import (
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"log"
+)
+
+type DBConfig struct{}
+
+func NewDBConfig() *DBConfig {
+	return &DBConfig{}
+}
+
+func (d *DBConfig) GormDB() *gorm.DB {
+	dsn := "root:root1234@tcp(localhost:3306)/test?charset=utf8&parseTime=True&loc=Local"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	mysqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	mysqlDB.SetMaxIdleConns(5)
+	mysqlDB.SetMaxOpenConns(10)
+	return db
+}
+```
+
+在 `main.go` 中注入
+
+```go
+package main
+
+import (
+	"goft-tutorial/ddd/interfaces/configs"
+	"goft-tutorial/ddd/interfaces/controllers"
+	"goft-tutorial/pkg/goft"
+)
+
+func main() {
+	goft.Ignite().
+		Config(configs.NewUserServiceConfig(), configs.NewDBConfig()).
+		Mount("v1", controllers.NewUserController()).
+		Launch()
+}
+```
+
+创建仓储相关的依赖注入新建文件 `ddd/interfaces/configs/RepoConfig.go`
+
+```go
+package configs
+
+import (
+	"goft-tutorial/ddd/domain/repos"
+	"goft-tutorial/ddd/infrastructure/dao"
+)
+
+type RepoConfig struct{}
+
+func NewRepoConfig() *RepoConfig {
+	return &RepoConfig{}
+}
+
+func (r *RepoConfig) UserRepo() repos.IUserRepo {
+	return &dao.UserRepo{}
+}
+```
+
+修改 `ddd/infrastructure/dao/UserRepo.go` 注入
+
+```go
+package services
+
+import (
+	"goft-tutorial/ddd/application/assembler"
+	"goft-tutorial/ddd/application/dto"
+	"goft-tutorial/ddd/domain/repos"
+)
+
+type UserService struct {
+	AssUserReq *assembler.UserReq
+	AssUserRsp *assembler.UserResp
+	userRepo   repos.IUserRepo `inject:"-"`
+}
+
+func (u *UserService) GetSimpleUserInfo(req *dto.SimpleUserReq) *dto.SimpleUserInfo {
+	userModel := u.AssUserReq.D2M_UserModel(req)
+	if err := u.userRepo.FindById(userModel); err != nil {
+		return nil
+	}
+	//userModel.UserID = userModel.Id
+	//userModel.UserName = "custer"
+	//userModel.UserPwd = "123"
+	//userModel.Extra.UserCity = "上海"
+	return u.AssUserRsp.M2D_SimpleUserInfo(userModel)
+}
+```
+
+修改 `main.go`
+
+```go
+package main
+
+import (
+	"goft-tutorial/ddd/interfaces/configs"
+	"goft-tutorial/ddd/interfaces/controllers"
+	"goft-tutorial/pkg/goft"
+)
+
+func main() {
+	goft.Ignite().
+		Config(configs.NewUserServiceConfig(), configs.NewDBConfig(), configs.NewRepoConfig()).
+		Mount("v1", controllers.NewUserController()).
+		Launch()
+}
+```
+
+代码变动 [git commit]()
+
+
+

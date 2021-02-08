@@ -747,7 +747,47 @@ nginx:1.19.6-alpine
 docker logs nginx
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/78b211b2b63b4120e962a8c9c5bb4d9c38881b3b#diff-d9b46c18eb099b2ccb6ffd4d1c1301939fab3dee37a5f3e13ff937352719e94dL1)
 
+### 8. 使用Rancher 1.x 来编排容器(1):基本操作
 
+Rancher 是个非常强大好用的容器管理（编排）工具。
+
+1.x 主攻容器编排，2.x 则全面转向 k8s 集群管理。
+
+这里使用的是1.6 文档：https://rancher.com/docs/rancher/v1.6/zh/
+
+```bash
+docker pull rancher/server
+
+sudo docker run -d --restart=unless-stopped \
+--name rc \
+-p 8080:8080 rancher/server
+```
+
+需要开启8080端口
+
+**查看防火墙是否开放8080端口**
+
+```bash  
+sudo firewall-cmd --zone=public --query-port=8080/tcp
+```
+
+**防火墙添加开放8080端口** 
+
+```bash  
+sudo firewall-cmd --zone=public --add-port=8080/tcp --permanent
+```
+
+**重启防火墙** 
+
+ ```bash 
+sudo firewall-cmd --reload
+ ```
+
+**在外部系统上测试端口是否可以使用**
+
+```bash  
+telnet 192.168.172.2 8080
+```
 

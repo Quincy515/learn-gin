@@ -8,7 +8,7 @@ import (
 
 func main() {
 	goft.Ignite().
-		Config(configs.NewUserServiceConfig()).
+		Config(configs.NewUserServiceConfig(), configs.NewDBConfig(), configs.NewRepoConfig()).
 		Mount("v1", controllers.NewUserController()).
 		Launch()
 }
