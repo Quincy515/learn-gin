@@ -14,7 +14,7 @@ import (
 func main() {
 	router := gin.Default()
 	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "this is myweb 4")
+		c.String(http.StatusOK, "this is myweb 4.1")
 	})
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"result": "pong"})

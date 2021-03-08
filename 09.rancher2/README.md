@@ -624,6 +624,8 @@ Server: Docker Engine - Community
 
 ### 6. Go调用Docker API：启动容器
 
+文档：https://docs.docker.com/engine/api/v1.41/#operation/ContainerCreate
+
 ```go
 package main
 
@@ -748,6 +750,61 @@ docker logs nginx
 ```
 
 代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/78b211b2b63b4120e962a8c9c5bb4d9c38881b3b#diff-d9b46c18eb099b2ccb6ffd4d1c1301939fab3dee37a5f3e13ff937352719e94dL1)
+
+**注意**
+
+> 如要进入alpine容器，命令是（后面的路径不是/bin/bash）：
+>
+> ` docker exec -it 容器id /bin/sh`
+
+如果可以访问到 nginx 服务器，在 nginx 容器中也可以 curl 到 web 容器，但是在页面访问 web，404报错，应该是 nginx 容器中的 `/etc/nginx/conf.d/default.conf` 文件优先匹配了 `location \ {}` , 需要在下方添加匹配规则 
+
+```nginx
+server {
+  ...
+
+  location /api/ {
+
+    proxy_pass http://172.17.0.2/;
+
+    proxy_set_header HOST $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+```
+
+也可以新建文件 `webconfig/myweb.conf` 
+
+```nginx
+# localhost
+server {
+  listen 80;
+  listen [::]:80;
+
+  server_name localhost;
+
+  location /api/ {
+
+    proxy_pass http://172.17.0.2/;
+
+    proxy_set_header HOST $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+```
+
+使用如下方法启动 nginx 容器
+
+```dockerfile
+docker run --name nginx -d \
+-v /home/custer/webconfig/myweb.conf:/etc/nginx/conf.d/default.conf \
+-p 80:80 \
+nginx:1.19.6-alpine
+```
 
 ### 8. 使用Rancher 1.x 来编排容器(1):基本操作
 

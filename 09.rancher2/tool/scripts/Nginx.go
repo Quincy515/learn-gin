@@ -21,10 +21,11 @@ func StartNginx() {
 	hostConfig := &container.HostConfig{
 		PortBindings: map[nat.Port][]nat.PortBinding{ //不需要暴露端口
 			"80/tcp": []nat.PortBinding{
-				nat.PortBinding{HostPort: "8080"}, //宿主机的端口
+				nat.PortBinding{HostPort: "80"}, //宿主机的端口
 			},
 		},
 		Binds: []string{"/home/custer/webconfig/nginx.conf:/etc/nginx/nginx.conf"},
+		//Binds: []string{"/home/custer/webconfig/myweb.conf:/etc/nginx/conf.d/default.conf"},
 	}
 	ret, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, "nginx")
 	if err != nil {
