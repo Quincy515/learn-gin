@@ -931,4 +931,29 @@ alpine:3.13 \
 
 <img src="../imgs/37.rancher-myweb.jpg" style="zoom:150%;" />
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/6f6885a2646396818c06e8366ea889c3a1fe5d0b)
+
+### 9.使用Rancher编排容器(2):nginx反代Go API
+
+对比手动部署 nginx 容器
+
+```dockerfile
+docker run --name nginx -d \
+-v /home/custer/webconfig/nginx.conf:/etc/nginx/nginx.conf \
+-p 80:80 \
+nginx:1.19.6-alpine
+```
+
+<img src="../imgs/38.rancher-nginx-1.jpg" style="zoom:150%;" />
+
+<img src="../imgs/39.rancher-nginx-2.jpg" style="zoom:150%;" />
+
+<img src="../imgs/40.rancher-nginx-3.jpg" style="zoom:150%;" />
+
+点击 create 创建 nginx 容器
+
+<img src="../imgs/41.rancher-nginx.jpg" style="zoom:150%;" />
+
+在浏览器访问 http://192.168.172.2/api/ping 可以看到 **{**"result": "pong"**}**
+
 代码变动 [git commit]()
