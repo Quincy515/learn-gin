@@ -105,17 +105,21 @@ sudo yum-config-manager \
     https://download.docker.com/linux/centos/docker-ce.repo
 ```
 
+如果执行后报错Peer's Certificate has expired
+
+首先安装时间同步软件 `sudo yum install ntp -y` 同步时间 `sudo ntpdate -u 0.centos.pool.ntp.org`
+
 ###### 查看 `docker-ce` 版本、`docker-ce-cli` 版本
 
 ```sh
-yum list docker-ce --showduplicates |sort -r
-yum list docker-ce-cli --showduplicates |sort -r
+sudo yum list docker-ce --showduplicates |sort -r
+sudo yum list docker-ce-cli --showduplicates |sort -r
 ```
 
 ######  安装指定版本.(`docker-ce-版本号` `docker-ce-cli-版本号`).
 
 ```bash
-yum install docker-ce-18.09.9-3.el7 docker-ce-cli-18.09.9-3.el7 containerd.io
+sudo yum install docker-ce-18.09.9-3.el7 docker-ce-cli-18.09.9-3.el7 containerd.io
 ```
 
 ###### INSTALL DOCKER ENGINE
@@ -955,5 +959,66 @@ nginx:1.19.6-alpine
 <img src="../imgs/41.rancher-nginx.jpg" style="zoom:150%;" />
 
 在浏览器访问 http://192.168.172.2/api/ping 可以看到 **{**"result": "pong"**}**
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e14737d74de924b49238a3518bfe6aea898890a3)
+
+### 10. Rancher编排容器(3):多主机启动API
+
+前面是单主机部署 go api 和 nginx 容器，首先再添加一个服务器或虚拟机，
+
+该虚拟机ip地址是 192.168.172.3 用户名是 custer 密码是 root1234
+
+在浏览器页面中删除上面创建的 infrastructure 中的 host ，这里从新创建 host
+
+两台虚拟主机的公网 ip 分别是 192.168.172.2 和 192.168.172.3，
+
+如果是在公有云中使用两台机器的内网 ip ，两个主机放在同一安全组，这样两台主机的端口都能互通。
+
+添加第一个主机
+
+```dockerfile
+sudo docker run --rm -e CATTLE_AGENT_IP=192.168.172.2  --privileged -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/rancher:/var/lib/rancher rancher/agent:v1.2.11 http://192.168.172.2:8080/v1/scripts/5892C8EDE6C3284D3270:1609372800000:qhpXECF0cHxC08hKJHBf76jLuEE
+```
+
+Cattle 是 Rancher 自己内置的缺省的编排环境 (其他的还有 k8s、swarm 等等)
+
+点击 close 可以查看已经创建了第一个主机，点击 add host 创建第二个主机
+
+<img src="../imgs/42.rancher-add-host-1.jpg" style="zoom:90%;" />
+
+在第二台主机中运行 
+
+```dockerfile
+sudo docker run --rm --privileged -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/rancher:/var/lib/rancher rancher/agent:v1.2.11 http://192.168.172.2:8080/v1/scripts/5892C8EDE6C3284D3270:1609372800000:qhpXECF0cHxC08hKJHBf76jLuEE
+```
+
+<img src="../imgs/43.rancher-add-host-2.jpg" style="zoom:90%;" />
+
+下面创建之前的 Go 服务，点击菜单栏 STACKS 的 ALL
+
+对照手动 的 docker run 命令
+
+```dockerfile
+docker run --name myweb -d \
+-v /home/custer/myweb:/app \
+-w /app \
+alpine:3.13 \
+./myserver
+
+docker run --name nginx -d \
+-v /home/custer/webconfig/myweb.conf:/etc/nginx/conf.d/default.conf \
+-p 80:80 \
+nginx:1.19.6-alpine
+```
+
+注意这里的第二台服务器也需要提前准备好 go 代码和 alpine 和 ngixn 镜像
+
+<img src="../imgs/44.rancher-stack-myweb-1.jpg" style="zoom:150%;" />
+
+![](../imgs/45.rancher-stack-myweb-2.jpg)
+
+<img src="../imgs/45.rancher-stack-myweb-2.jpg" style="zoom:150%;" />
+
+**有防火墙注意需要开放这两个端口 500 和 4500**
 
 代码变动 [git commit]()
