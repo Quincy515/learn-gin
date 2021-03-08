@@ -808,6 +808,14 @@ nginx:1.19.6-alpine
 
 ### 8. 使用Rancher 1.x 来编排容器(1):基本操作
 
+上面之所以使用 `docker run` 没有使用 `docker-compose` 工具来编排容器，
+
+是因为我们要学习使用 `rancher` 来编排容器。
+
+[rancher/server](https://hub.docker.com/r/rancher/server/)  This image is for Rancher 1.x.
+
+**For Rancher 2.x, see the [rancher/rancher](https://hub.docker.com/r/rancher/rancher/) image.**
+
 Rancher 是个非常强大好用的容器管理（编排）工具。
 
 1.x 主攻容器编排，2.x 则全面转向 k8s 集群管理。
@@ -848,3 +856,79 @@ sudo firewall-cmd --reload
 telnet 192.168.172.2 8080
 ```
 
+访问浏览器查看 http://192.168.172.2:8080/ 
+
+首先点击菜单栏 ADMIN 选择 Access Control 添加 Local Authentication，设定 Login Username 和密码。
+
+然后选择菜单栏 infrastructure 点击 host 添加 Custom，关键在于第5步，复制，在服务器中执行 
+
+```shell
+sudo docker run --rm --privileged -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/rancher:/var/lib/rancher rancher/agent:v1.2.11 http://192.168.172.2:8080/v1/scripts/5892C8EDE6C3284D3270:1609372800000:qhpXECF0cHxC08hKJHBf76jLuEE
+```
+
+执行结果 
+
+```shell
+[custer@localhost ~]$ sudo docker run --rm --privileged -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/rancher:/var/lib/rancher rancher/agent:v1.2.11 http://192.168.172.2:8080/v1/scripts/5892C8EDE6C3284D3270:1609372800000:qhpXECF0cHxC08hKJHBf76jLuEE
+[sudo] custer 的密码：
+Unable to find image 'rancher/agent:v1.2.11' locally
+v1.2.11: Pulling from rancher/agent
+b3e1c725a85f: Pull complete
+6a710864a9fc: Pull complete
+d0ac3b234321: Pull complete
+87f567b5cf58: Pull complete
+063e24b217c4: Pull complete
+d0a3f58caef0: Pull complete
+16914729cfd3: Pull complete
+bbad862633b9: Pull complete
+3cf9849d7f3c: Pull complete
+Digest: sha256:0fba3fb10108f7821596dc5ad4bfa30e93426d034cd3471f6ccd3afb5f87a963
+Status: Downloaded newer image for rancher/agent:v1.2.11
+
+INFO: Running Agent Registration Process, CATTLE_URL=http://192.168.172.2:8080/v1
+INFO: Attempting to connect to: http://192.168.172.2:8080/v1
+INFO: http://192.168.172.2:8080/v1 is accessible
+INFO: Configured Host Registration URL info: CATTLE_URL=http://192.168.172.2:8080/v1 ENV_URL=http://192.168.172.2:8080/v1
+INFO: Inspecting host capabilities
+INFO: Boot2Docker: false
+INFO: Host writable: true
+INFO: Token: xxxxxxxx
+INFO: Running registration
+INFO: Printing Environment
+INFO: ENV: CATTLE_ACCESS_KEY=8ED985F780AD9E78AF7F
+INFO: ENV: CATTLE_HOME=/var/lib/cattle
+INFO: ENV: CATTLE_REGISTRATION_ACCESS_KEY=registrationToken
+INFO: ENV: CATTLE_REGISTRATION_SECRET_KEY=xxxxxxx
+INFO: ENV: CATTLE_SECRET_KEY=xxxxxxx
+INFO: ENV: CATTLE_URL=http://192.168.172.2:8080/v1
+INFO: ENV: DETECTED_CATTLE_AGENT_IP=172.17.0.1
+INFO: ENV: RANCHER_AGENT_IMAGE=rancher/agent:v1.2.11
+INFO: Launched Rancher Agent: 4d89d7cda516c978864f0d7e4747f5cfc60818148fc4ad4ecce5e46873d56395
+[custer@localhost ~]$
+```
+
+在浏览器中点击 close 可以查看到 rancher 管理的容器，点击 add container 可以创建容器
+
+首先创建 go api 容器，手动执行docker 语句是
+
+```dockerfile
+docker run --name myweb -d \
+-v /home/custer/myweb:/app \
+-w /app \
+alpine:3.13 \
+./myserver
+```
+
+在 rancher 中创建容器，网络使用内置的 Bridge，点击 Create
+
+<img src="../imgs/34.rancher-create-1.jpg" alt="34.rancher-create-1" style="zoom:150%;" />
+
+<img src="../imgs/35.rancher-create-2.jpg" style="zoom:150%;" />
+
+<img src="../imgs/36.rancher-create-3.jpg" style="zoom:150%;" />
+
+创建成功之后可以在 infrastructure -> host 里可以看到在 Standalone Containers 里有 myweb ，点击进入可以看到 
+
+<img src="../imgs/37.rancher-myweb.jpg" style="zoom:150%;" />
+
+代码变动 [git commit]()
