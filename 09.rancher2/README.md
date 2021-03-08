@@ -1021,4 +1021,22 @@ nginx:1.19.6-alpine
 
 **有防火墙注意需要开放这两个端口 500 和 4500**
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/0764265b90b86658c0ae954578bf106de013bf07)
+
+### 11. Rancher编排容器(4):创建简单多节点负载均衡
+
+<img src="../imgs/46.rancher-stacks-load-balancer.jpg" style="zoom:150%;" />
+
+<img src="../imgs/47.rancher-load-balance.jpg" style="zoom:150%;" />
+
+点击 create 可以看到 
+
+<img src="../imgs/48.rancher-goapi-lb.jpg" style="zoom:150%;" />
+
+点击 Ports: 80/tcp 可以在浏览器上看到访问的 ip，可以判断是部署在哪个服务器上的。
+
+如果上面的部署是使用内网IP，则输入对应的服务器的公网ip即可。
+
+如果两个服务器中输出代码不同，可以查看到轮询的效果。
+
 代码变动 [git commit]()
