@@ -1137,3 +1137,117 @@ server {
 }
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/24c67308c3db06dc9694cf94196b897bd12d5822)
+
+### 13. Rancher编排容器(6):前后端分离简单部署
+
+前后端分离，前端使用 vue + iview 构建一个特别简单的程序
+
+For Vue 3, you should use Vue CLI v4.5 available on `npm` as `@vue/cli`. To upgrade, you need to reinstall the latest version of `@vue/cli` globally:
+
+```bash
+yarn global add @vue/cli
+# OR
+npm install -g @vue/cli
+```
+
+Then in the Vue projects, run
+
+```bash
+vue upgrade --next
+```
+
+Vue projects can quickly be set up with Vite by running the following commands in your terminal.
+
+With npm:
+
+```bash
+npm init @vitejs/app <project-name>
+cd <project-name>
+npm install
+npm run dev
+```
+
+Or with Yarn:
+
+```bash
+yarn create @vitejs/app <project-name>
+cd <project-name>
+yarn
+yarn dev
+```
+
+It might occur, that when your username has a space in it like 'Mike Baker' that vite cannot succeed. Have a try with
+
+```bash
+create-vite-app <project-name>
+```
+
+创建 vue-cli 项目
+
+1. `vue create myui`
+2. `cd myui` 打开文件夹
+3. `npm install iview --save` 安装 iview 框架
+4. `npm install --save vue-router` 安装 view 路由
+
+iview 文档  http://iview.talkingdata.com/#/components/guide/start
+
+5. 启动服务 `npm run serve`
+6. 打包服务 `npm run build`
+
+生成编译好的 `dist` 文件，需要上传到服务器，在服务器上新建目录 myui ，上传dist 目录下的内容。
+
+<img src="../imgs/52.myui.jpg" style="zoom:150%;" />
+
+修改配置文件
+
+```nginx
+upstream goapi {
+  server 10.42.19.222;
+  server 10.42.55.71;
+}
+
+# localhost
+server {
+  listen 80;
+  listen [::]:80;
+
+  server_name localhost;
+
+  set $base /usr/share/nginx;
+  root $base/html;
+
+  location /api/ {
+
+    proxy_pass http://goapi/;
+
+    proxy_set_header HOST $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+```
+
+注意这里 
+
+```nginx
+	set $base /usr/share/nginx;
+  root $base/html;
+```
+
+只需要把前端文件目录  `myui` 映射到容器里的 `/usr/share/nginx/html` 即可。
+
+更新 rancher mynginx 的配置
+
+<img src="../imgs/53.rancher-myui-1.jpg" style="zoom:100%;" />
+
+<img src="../imgs/54.rancher-myui-2.jpg" style="zoom:100%;" />
+
+点击 upgrade
+
+<img src="../imgs/55.rancher-myui-3.jpg" style="zoom:100%;" />
+
+前后端分离部署，使用 nginx。
+
+代码变动 [git commit]()
