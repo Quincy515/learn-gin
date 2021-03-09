@@ -2105,3 +2105,6 @@ mysql>
 ```
 
 代码变动 [git commit]()
+
+### 16. 快速部署Rancher2和K8s集群
+
