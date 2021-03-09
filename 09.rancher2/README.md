@@ -1039,7 +1039,101 @@ nginx:1.19.6-alpine
 
 如果两个服务器中输出代码不同，可以查看到轮询的效果。
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/30f883a85ea8095a7f2a85466713c27ffcb1b20f)
 
 ### 12. Rancher编排容器(5):多节点下nginx配置、SSL等
+
+之前学习了单节点 nginx 配置，上面使用了内置的负载均衡，首先停止上面使用的内置的负载均衡。
+
+然后部署 nginx，使用域名的方式，并使用证书。
+
+对照下之前手动 docker run 创建的 nginx
+
+```dockerfile
+docker run --name nginx -d \
+-v /home/custer/webconfig/myweb.conf:/etc/nginx/conf.d/default.conf \
+-p 80:80 \
+nginx:1.19.6-alpine
+```
+
+这里需要加上证书的位置
+
+```dockerfile
+/home/custer/webconfig/certs:/certs
+```
+
+对照下，通过 rancher 来创建
+
+<img src="../imgs/49.rancher-mynginx-1.jpg" style="zoom:150%;" />
+
+<img src="../imgs/50.rancher-mynginx-2.jpg" style="zoom:150%;" />
+
+修改 nginx 配置文件 
+
+```nginx
+upstream goapi {
+  server 10.42.19.222;
+  server 10.42.55.71;
+}
+
+server {
+  listen 80;
+  listen [::]:80;
+
+  server_name localhost;
+
+  location /api/ {
+
+    proxy_pass http://goapi/;
+
+    proxy_set_header HOST $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+```
+
+<img src="../imgs/51.rancher-mynginx-3.jpg" style="zoom:150%;" />
+
+访问部署的那个容器的宿主机ip地址，或者添加域名了，直接访问域名即可。
+
+配置证书
+
+```nginx
+upstream goapi {
+  server 10.42.19.222;
+  server 10.42.55.71;
+}
+
+server {
+  listen 80;
+  server_name www.xxx.com;
+  charset     utf-8;
+  return 301 https://$server_name$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  ssl_certificate "/certs/1_www.xxx.com_bundle.crt";
+  ssl_certificate_key "/certs/2_www.xxx.com.key";
+  ssl_session_timeout 5m;
+  ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+  ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:HIGH:!aNULL:!MD5:!RC4:!DHE;
+  ssl_prefer_server_ciphers on;
+
+  server_name www.xxx.com;
+
+  location /api/ {
+
+    proxy_pass http://goapi/;
+
+    proxy_set_header HOST $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+```
 
