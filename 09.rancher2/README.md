@@ -2255,5 +2255,31 @@ Nginx    [nginx:1.18-alpine](https://hub.docker.com/_/nginx)
 
 代码变动 [git commit]()
 
+### 18. 部署一个go api到k8s集群中(初级)、Hostport
+
+<img src="../imgs/80.k8s-goapi-1.jpg" style="zoom:100%;" />
+
+HostPort 
+
+> 直接将容器的端口与所调度的节点上的端口进行映射。
+
+之前使用的单机部署
+
+```dockerfile
+docker pull alpine:3.13
+
+docker run -d --name myweb \
+-v /home/custer/myweb:/app \
+-w /app \
+-p 8081:80 \
+alpine:3.13 \
+./myserver
+```
+
+<img src="../imgs/81.k8s-goapi-2.jpeg" style="zoom:100%;" />
+
+<img src="../imgs/82.k8s-goapi-3.jpg" style="zoom:100%;" />
+
+代码变动 [git commit]()
 
 
