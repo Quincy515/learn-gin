@@ -2211,5 +2211,49 @@ sudo docker run --privileged -d --restart=unless-stopped -p 8080:80 -p 8443:443 
 
 针对work节点，只需要 worker。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/a35e08a7d98d7bdce84914e8c24de8527071878f)
+
+### 17. 创建项目、namespace、初步部署nginx、nodeport
+
+Namespace
+
+> 是对一组资源和对象的抽象集合， **用来将系统内部的对象划分为不同的项目组或用户组**
+>
+> 常用来隔离不同的用户，比如Kubernetes自带的服务一般运行在kube-system namespace中。
+
+<img src="../imgs/73.k8s-namespace-1.jpg" style="zoom:100%;" />
+
+<img src="../imgs/74.k8s-namespace-2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/75.k8s-namespace-3.jpg" style="zoom:100%;" />
+
+<img src="../imgs/76.k8s-namespace-4.jpg" style="zoom:100%;" />
+
+<img src="../imgs/77.k8s-namespace-5.jpg" style="zoom:100%;" />
+
+workload
+
+> Pod是所有业务类型的基础，也是K8S管理的最小单位级，
+>
+> 可以理解为  **它是一个或多个容器的组合**
+
+<img src="../imgs/72.k8s.png" style="zoom:50%;" />
+
+<img src="../imgs/78.k8s-workload-1.jpg" style="zoom:100%;" />
+
+NodePort
+
+> 在所有节点（虚拟机）上开放一个特定端口，任何发送到该端口的流量都被转发到对应服务
+>
+> 端口范围 30000-32767
+
+Nginx    [nginx:1.18-alpine](https://hub.docker.com/_/nginx)
+
+<img src="../imgs/79.k8s-nodeport-1.jpg" style="zoom:100%;" />
+
+<img src="../imgs/79.k8s-nodeport-2.jpg" style="zoom:100%;" />
+
 代码变动 [git commit]()
+
+
 
