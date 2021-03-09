@@ -2,6 +2,21 @@ Rancher2+k8s无脑上手 https://www.jtthink.com/course/play/2757
 
 [toc]
 
+Centos7 虚拟机安装之后的配置
+
+```bash
+su // 切换到 root 用户
+sudo vi /etc/sudoers // 添加操作用户的 sudo 权限
+sudo vi /etc/sysconfig/network-scripts/ifcfg-ens33 // 修改虚拟机网络
+ONBOOT=no  改为  ONBOOT=yes
+sudo service network restart // 重启网络服务
+ip addr // 查看ip地址
+hostnamectl set-hostname k8s.rancher2.com // 修改主机名
+hostname // 查看主机名
+```
+
+
+
 ### 1. 部署第一个程序
 
 1. 简单部署
@@ -2104,7 +2119,97 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 mysql>
 ```
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/0236e9b926b9ee81d09964c81d92fa7a4a54ac87)
 
 ### 16. 快速部署Rancher2和K8s集群
+
+文档 https://www.kubernetes.org.cn/k8s 
+
+Kubernetes（通常称为 K8s）是开源容器集群管理系统，用于自动部署，扩展和管理容器化应用程序。
+
+准备工作
+
+1. 非必要
+
+```bash
+docker stop $(docker ps -aq) // stop 停止所有容器
+docker rm $(docker ps -aq) // remove 删除所有容器
+```
+
+2. 关闭防火墙
+
+```bash
+systemctl stop firewalld && systemctl disable firewalld
+```
+
+3. 关闭 SELinux
+
+```bash
+sudo setenforce 0
+sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+```
+
+4. 关闭 swap
+
+```bash
+sudo swapoff -a
+```
+
+重启docker
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+
+在主机创建空的文件夹
+
+```bash
+[custer@k8s01 ~]$ mkdir rancher
+```
+
+启动rancher，安装到主节点或者专门的 rancher 服务器上，一般有三台服务器，
+
+1. rancher 服务器
+2. master 主节点 
+3. work 工作节点
+
+```bash
+sudo docker run -d --restart=unless-stopped -p 8080:80 -p 8443:443 -v /home/custer/rancher:/var/lib/rancher/ rancher/rancher:stable
+```
+
+如果是把rancher安装在主节点上，访问主节点的公网ip:8080
+
+**docker 启动rancher，无法访问，报错**
+
+>[custer@k8s01 ~]$ docker logs naughty_ishizaka
+>ERROR: Rancher must be ran with the --privileged flag when running outside of Kubernetes
+
+问题解决: 启动时添加 --privileged *作用其实就是启动的 container内的root拥有真正的root权限！！！*
+
+```bash
+sudo docker run --privileged -d --restart=unless-stopped -p 8080:80 -p 8443:443 -v /home/custer/rancher:/var/lib/rancher/ rancher/rancher:stable
+```
+
+<img src="../imgs/65.rancher2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/66.rancher2-url.jpg" style="zoom:100%;" />
+
+点击添加集群
+
+<img src="../imgs/67.rancher2-mycluster-1.jpg" style="zoom:100%;" />
+
+<img src="../imgs/68.rancher2-mycluster-2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/69.rancher2-mycluer-3.jpg" style="zoom:100%;" />
+
+<img src="../imgs/70.rancher2-mycluster-4.jpg" style="zoom:100%;" />
+
+和rancher1.6类似，需要到主机上执行，针对master服务器这几个都要勾选。
+
+<img src="../imgs/71.rancher-mycluster-5.jpg" style="zoom:100%;" />
+
+针对work节点，只需要 worker。
+
+代码变动 [git commit]()
 
