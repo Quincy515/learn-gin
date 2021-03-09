@@ -1902,4 +1902,206 @@ OK
 127.0.0.1:6379>
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/0c5e5fd3b23c6922f444b0655b50086875a67d17)
+
+### 15. Rancher编排容器(8):单机部署mysql5.7
+
+https://hub.docker.com/_/mysql 
+
+```dockerfile
+docker pull mysql:5.7
+```
+
+查看文档，默认配置文件在 `/etc/mysql/my.cnf`
+
+接下来创建一个 mysql 文件夹，包含
+
+1. data 目录，存放数据
+2. logs 目录，存放日志
+3. my.cnf 主配置文件
+
+```mysql
+[client]
+port=3306
+default-character-set=utf8mb4
+[mysql]
+default-character-set=utf8mb4
+ 
+[mysqld]
+log-error=/mysql/logs/error.log
+slow_query_log = on
+long_query_time=2
+slow-query-log-file =/mysql/logs/slow.log
+
+secure-file-priv=''
+character-set-client-handshake = FALSE 
+#服务器端的端口号
+port=3306
+ 
+#MySQL数据库数据文件的目录
+datadir=/mysql/data
+ 
+character-set-server = utf8mb4 
+collation-server = utf8mb4_general_ci
+init_connect='SET NAMES utf8mb4'
+ 
+#MySQL软件的存储引擎
+default-storage-engine=INNODB
+# Set the SQL mode to strict
+#MySQL软件的SQL模式
+sql-mode="STRICT_TRANS_TABLES,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+#MySQL软件的最大连接数
+max_connections=200
+#MySQL软件的查询缓存
+query_cache_size=0
+ 
+#MySQL软件内存中可以存储临时表的最大值
+tmp_table_size=11M
+#MySQL软件中可以保留的客户端连接线程数
+thread_cache_size=8
+#MySQL软件重建索引时允许的最大临时文件的大小
+myisam_max_sort_file_size=100G
+#MySQL软件重建索引时允许的最大缓存大小
+myisam_sort_buffer_size=22M
+#MySQL软件中最大关键字缓存大小
+key_buffer_size=10M
+#MySQL软件全扫描MyISAM表时的缓存大小
+read_buffer_size=64K
+#MySQL软件可以插入排序好数据的缓存大小
+read_rnd_buffer_size=256K
+#MySQL软件用户排序时缓存大小
+sort_buffer_size=256K
+#*** INNODB Specific options ***
+#关于INNODB存储引擎参数设置
+ 
+#关于提交日志的时机
+innodb_flush_log_at_trx_commit=1
+#存储日志数据的缓存区的大小
+innodb_log_buffer_size=1M
+#缓存池中缓存区大小
+innodb_buffer_pool_size=52M
+#日志文件的大小
+innodb_log_file_size=26M
+#允许线程的最大数
+innodb_thread_concurrency=9
+```
+
+我们在目标主机 192.168.172.3 上操作
+
+```bash
+mkdir mysql && cd mysql
+mkdir data  logs
+vi my.cnf
+```
+
+手工 docker run 启动命令
+
+```dockerfile
+docker run --name mysql -d \
+-v /home/custer/mysql:/mysql \
+-v /home/custer/mysql/my.cnf:/etc/mysql/my.cnf \
+-e MYSQL_ROOT_PASSWORD=123456 \
+mysql:5.7
+```
+
+使用 rancher 图形界面，首先 Add Stack
+
+<img src="../imgs/61.rancher-mysql-1.jpg" style="zoom:100%;" />
+
+添加 Add Service
+
+<img src="../imgs/62.rancher-mysql-2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/63.rancher-mysql-3.jpg" style="zoom:100%;" />
+
+<img src="../imgs/64.rancher-mysql-4.jpg" style="zoom:100%;" />
+
+此时 logs 文件夹没有权限处理。会启动错误
+
+处理 logs 文件夹的权限问题
+
+```dockerfile
+docker run -it --rm --entrypoint="/bin/bash" mysql:5.7 -c "cat /etc/group"
+```
+
+找到 logs 文件夹 
+
+```bash
+sudo chown -R xxx logs
+```
+
+然后重新启动即可。具体操作如下
+
+```bash
+[custer@localhost ~]$ docker run -it --rm --entrypoint="/bin/bash" mysql:5.7 -c "cat /etc/group"
+root:x:0:
+daemon:x:1:
+bin:x:2:
+sys:x:3:
+adm:x:4:
+tty:x:5:
+disk:x:6:
+lp:x:7:
+mail:x:8:
+news:x:9:
+uucp:x:10:
+man:x:12:
+proxy:x:13:
+kmem:x:15:
+dialout:x:20:
+fax:x:21:
+voice:x:22:
+cdrom:x:24:
+floppy:x:25:
+tape:x:26:
+sudo:x:27:
+audio:x:29:
+dip:x:30:
+www-data:x:33:
+backup:x:34:
+operator:x:37:
+list:x:38:
+irc:x:39:
+src:x:40:
+gnats:x:41:
+shadow:x:42:
+utmp:x:43:
+video:x:44:
+sasl:x:45:
+plugdev:x:46:
+staff:x:50:
+games:x:60:
+users:x:100:
+nogroup:x:65534:
+mysql:x:999:
+[custer@localhost ~]$ id
+uid=1000(custer) gid=1000(custer) 组=1000(custer),994(docker) 环境=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+[custer@localhost ~]$ cd mysql/
+[custer@localhost mysql]$ ls -la
+总用量 4
+drwxrwxr-x. 4 custer  custer   44 3月   8 06:59 .
+drwx------. 6 custer  custer  139 3月   8 06:58 ..
+drwxrwxr-x. 2 polkitd custer    6 3月   8 07:16 data
+drwxrwxr-x. 2 custer  custer    6 3月   8 06:59 logs
+-rw-rw-r--. 1 custer  custer 1723 3月   8 06:59 my.cnf
+[custer@localhost mysql]$ sudo chown -R 999 logs
+[sudo] custer 的密码：
+[custer@localhost mysql]$ docker exec -it 95f58e2a0972 /bin/bash
+root@95f58e2a0972:/# mysql -uroot -p
+Enter password:
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 2
+Server version: 5.7.33-log MySQL Community Server (GPL)
+
+Copyright (c) 2000, 2021, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql>
+```
+
 代码变动 [git commit]()
