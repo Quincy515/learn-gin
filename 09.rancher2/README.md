@@ -2347,3 +2347,122 @@ Ingress
 
 代码变动 [git commit]()
 
+### 20. ClusterIP模式、服务发现基本入门和调用
+
+<img src="../imgs/92.k8s-clusterip-1.jpg" style="zoom:100%;" />
+
+<img src="../imgs/93.k8s-clusterip-2.jpg" style="zoom:100%;" />
+
+把 NodePort 切换成 ClusterIP
+
+> ClusterIP，创建集群内的服务，应用只要在集群内都可以访问，外部（如公网）无法访问。
+
+<img src="../imgs/94.k8s-clusterip-3.jpg" style="zoom:100%;" />
+
+上传test.go文件到master服务器 `/home/custer/mytest/src`
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"io/ioutil"
+	"log"
+	"net/http"
+)
+
+func main(){
+
+	r:=gin.Default()
+	r.Handle("GET","/", func(context *gin.Context) {
+		 host:=context.Query("host")
+		 if host==""{
+			 context.JSON(400,gin.H{"error":"no host!"})
+			 return
+		 }
+		 // http://mygo
+		 rsp,err:=http.Get("http://"+host)
+		 if err!=nil{
+		 	context.JSON(400,gin.H{"error":err})
+		 }else{
+		 	b,err:=ioutil.ReadAll(rsp.Body)
+		 	if err!=nil{
+				context.JSON(400,gin.H{"error":err})
+			}else{
+				context.JSON(200,gin.H{"message":string(b)})
+			}
+
+		 }
+	})
+
+
+	err:=r.Run(":80")
+	if err!=nil{
+		log.Fatal(err)
+	}
+}
+```
+
+新建文件 `go.mod`
+
+```go
+module test
+go 1.15
+```
+
+使用docker编译go代码
+
+```dockerfile
+docker run --rm -it \
+-v /home/custer/mytest:/app \
+-w /app/src \
+-e GOPROXY=https://goproxy.cn \
+golang:1.15.7-alpine3.13 \
+go build -o ../myserver test.go
+```
+
+然后使用 rancher 部署mytest服务
+
+手工部署
+
+```dockerfile
+docker run -d --name myweb \
+-v /home/custer/mytest:/app \
+-w /app \
+-p 8081:80 \
+alpine:3.13 \
+./myserver
+```
+
+<img src="../imgs/95.k8s-mytest-1.jpeg" style="zoom:100%;" />
+
+这样就部署好了 mytest服务，下面如何访问设置为 clusterIP 的 mygo 服务。
+
+<img src="../imgs/96.k8s-mytest-2.jpg" style="zoom:100%;" />
+
+选择服务发现 Service Discovery
+
+<img src="../imgs/97.k8s-mytest-3.jpg" style="zoom:100%;" />
+
+服务发现简单机制
+
+Rancher2.4 使用 k8s-coredns 作为服务发现基础
+
+- 在同一个命名空间内：可以通过 service_name 直接解析
+- 在不同命名空间内：service_name.namespace_name
+
+在上创建 workloads 时的 mygo 和 mytest 名称，会自动添加一条解析记录，
+
+在容器内可以直接使用该名称进行访问。
+
+访问 http://192.168.172.4:8081/?host=mygo 可以自动解析 mygo 访问到内容。
+
+这是访问同一个namespace 下的 workload，现在再部署一个 mytest 在不同的 namespace 下。
+
+<img src="../imgs/98.k8s-mytest-4.jpeg" style="zoom:100%;" />
+
+不在同一个命名空间，进行访问 http://192.168.172.4:8082/?host=mygo.myweb
+
+<img src="../imgs/99.k8s-mytest-5.jpg" style="zoom:100%;" />
+
+代码变动 [git commit]()
