@@ -2253,7 +2253,7 @@ Nginx    [nginx:1.18-alpine](https://hub.docker.com/_/nginx)
 
 <img src="../imgs/79.k8s-nodeport-2.jpg" style="zoom:100%;" />
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/e70b13994838ba16f423061673f9e0dbab00aad4)
 
 ### 18. 部署一个go api到k8s集群中(初级)、Hostport
 
@@ -2280,6 +2280,70 @@ alpine:3.13 \
 
 <img src="../imgs/82.k8s-goapi-3.jpg" style="zoom:100%;" />
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/35dc05640e44d1822c915cf2296a4ac2eb5e8cca)
 
+### 19. 2个go api进行负载均衡(ingress)
+
+目前环境 
+
+rancher服务器 master 主机 192.168.172.4
+
+worker 主机 192.168.172.5 
+
+现在在这两个服务器上都上传go的源代码文件，并使用 docker 进行 build
+
+```dockerfile
+docker run --rm -it \
+-v /home/custer/myweb:/app \
+-w /app/src \
+-e GOPROXY=https://goproxy.cn \
+golang:1.15.7-alpine3.13 \
+go build -o ../myserver main.go
+```
+
+<img src="../imgs/84.k8s-goapi-4.jpg" style="zoom:100%;" />
+
+之前是把 go api 部署在单节点，现在进行修改，
+
+<img src="../imgs/85.k8s-goapi-5.jpg" style="zoom:100%;" />
+
+修改为
+
+<img src="../imgs/86.k8s-goapi-6.jpg" style="zoom:100%;" />
+
+删除残余的出错节点
+
+<img src="../imgs/87.k8s-goapi-7.jpg" style="zoom:100%;" />
+
+添加负载均衡
+
+<img src="../imgs/88.k8s-lb-1.jpg" style="zoom:100%;" />
+
+Ingress 
+
+> 相当与一个7层负载均衡器，理解为进行反代并定义规则的一个api 对象
+>
+> ingressController通过监听 ingress api 转化为各自的配置(常用的有nginx-ingress，trafik-ingress)
+
+```bash
+                                    ingress
+                             /          |             \
+                     xxx1.com        xxx2.com            xxx3.com
+                     /                  |                   \  
+            workload/service     workload/service       workload/service
+             /        \              /      \               /        \
+           pod         pod         pod       pod           pod       pod
+```
+
+<img src="../imgs/89.k8s-lb-2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/90.k8s-lb-3.jpg" style="zoom:100%;" />
+
+添加了负载均衡，就可以在外网访问。
+
+<img src="../imgs/91.k8s-lb-4.jpg" style="zoom:100%;" />
+
+相比之前的就是80是外网访问，32602/tcp是内网访问，如果之前在添加rancher时使用的是内网ip地址，则32602是不能被外网访问的。
+
+代码变动 [git commit]()
 
