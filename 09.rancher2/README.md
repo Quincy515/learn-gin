@@ -2483,7 +2483,7 @@ Network File System
 
 每台主机都是 centos7 系统，使用相同的用户名，正规来说应该再准备一个 nfs 服务器。
 
-这里使用 work 服务器部署 nfs。
+这里使用 work 服务器 192.168.172.5 部署 nfs。
 
 安装和配置：
 
@@ -2534,10 +2534,10 @@ abc
 sudo vi /etc/exports
 ```
 
-写入如下内容-共享目录 内容IP地址 配置
+写入如下内容-共享目录 内部IP地址 配置
 
 ```bash
-/home/custer/goapi 192.168.172.4/24(rw,async)
+/home/custer/goapi 192.168.172.5/24(rw,async)
 ```
 
 | 参数           | 作用                                                         |
@@ -2585,7 +2585,7 @@ sudo mount -t nfs 192.168.172.5:/home/custer/goapi /home/custer/goapi
 卸载只要 
 
 ```bash
-sudo unmount /home/custer/goapi
+sudo umount /home/custer/goapi
 ```
 
 查看挂载 `df -h`
@@ -2608,5 +2608,127 @@ tmpfs                             378M     0  378M    0% /run/user/1000
 ```
 
 这样只需要在一台服务器上进行文件的上传，其他服务器只要挂载该目录，就都有了。
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/cc3d437cc3e77ebd3bf09f116c5526d9cac4a9d5)
+
+### 22. 使用Rancher创建PV和PVC、运行GoAPI
+
+之前创建goapi的方式，是在每台主机上创建文件夹，把程序文件分别上传到每台主机，
+
+使用 nfs 就可以挂载 nfs 服务器上的文件夹。
+
+我们把 nfs 服务器放到了 work 机器，192.168.172.5。
+
+先把我们的 goapi 程序上传到 nfs 服务器
+
+```bahs
+[custer@k8s02 goapi]$ ls
+myserver  src
+```
+
+然后把之前在其他服务器上的挂载 `umount`
+
+```bash
+[custer@k8s01 src]$ df -h
+文件系统                          容量  已用  可用 已用% 挂载点
+devtmpfs                          1.9G     0  1.9G    0% /dev
+tmpfs                             1.9G     0  1.9G    0% /dev/shm
+tmpfs                             1.9G   14M  1.9G    1% /run
+tmpfs                             1.9G     0  1.9G    0% /sys/fs/cgroup
+/dev/mapper/centos-root            17G  9.1G  8.0G   54% /
+/dev/sda1                        1014M  151M  864M   15% /boot
+tmpfs                             378M     0  378M    0% /run/user/1000
+192.168.172.5:/home/custer/goapi   17G  5.5G   12G   33% /home/custer/goapi
+[custer@k8s01 src]$ sudo umount /home/custer/goapi
+umount.nfs: /home/custer/goapi: device is busy
+[custer@k8s01 src]$ cd
+[custer@k8s01 ~]$ sudo umount /home/custer/goapi
+[custer@k8s01 ~]$ df -h
+文件系统                 容量  已用  可用 已用% 挂载点
+devtmpfs                 1.9G     0  1.9G    0% /dev
+tmpfs                    1.9G     0  1.9G    0% /dev/shm
+tmpfs                    1.9G   14M  1.9G    1% /run
+tmpfs                    1.9G     0  1.9G    0% /sys/fs/cgroup
+/dev/mapper/centos-root   17G  9.1G  8.0G   54% /
+/dev/sda1               1014M  151M  864M   15% /boot
+tmpfs                    378M     0  378M    0% /run/user/1000
+[custer@k8s01 ~]$
+```
+
+实际上在正式上线部署，也不能在每台机器上都放一个 myserver 可执行程序。
+
+下面先把前面的内容做几个改动
+
+```bash
+sudo vi /etc/exports
+```
+
+修改成
+
+```bash
+/home/custer/goapi 192.168.172.5/24(rw,async,insecure,no_root_squash)
+```
+
+然后执行 `exportfs -a` 重新加载配置
+
+```bash
+sudo exportfs -a
+```
+
+参数说明：
+
+> Root_squash(默认): 将来访的root用户映射为匿名用户或用户组
+>
+> no_root_squash: 来访的root用户保持root账号权限
+>
+> no_all_squash(默认): 访问用户先与本机用户匹配，匹配失败后再映射为匿名用户或用户组
+>
+> all_squash: 将来访的所有用户映射为匿名用户或用户组
+>
+> secure(默认): 限制客户端之鞥呢从小于1024的tcp/ip端口连接服务器
+>
+> insecure: 允许客户端从大于1024的tcp/ip端口连接服务器
+>
+> anonuid: 匿名用户的uid值，通常是nobody或nfsnobody，可以在此处自行设定
+>
+> anongid: 匿名用户的gid值
+>
+> no_subtree_check: 如果 nfs 输出的是一个子目录，则无需检查其父目录的权限(可提高效率)
+
+PV (Persistent Volume持久卷) PVC(Persistent Volume Claim)
+
+> PV: 定义 Volume 的类型，挂载目录，远程存储服务器等
+>
+> PVC：定义 Pod 想要使用的持久化属性，比如存储大小、读写权限等
+
+StorageClass 存储类
+
+>  PV的模板，自动为PVC创建PV。
+
+<img src="../imgs/100.k8s-pv-1.jpg" style="zoom:100%;" />
+
+PV 全局的集群资源，不针对某一个项目，或命名空间。
+
+添加 PV
+
+<img src="../imgs/101.k8s-pv-2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/102.k8s-pvc-1.jpg" style="zoom:100%;" />
+
+<img src="../imgs/103.k8s-pvc-2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/104.k8s-pvc-3.jpg" style="zoom:100%;" />
+
+这样 PV 就可以 PVC 绑定了，PVC 也定义了
+
+<img src="../imgs/104.k8s-pvc-3.jpg" style="zoom:100%;" />
+
+清空了之前的工作服在 workload，部署新的工作负载
+
+<img src="../imgs/105.k8s-workload-1.jpeg" style="zoom:100%;" />
+
+<img src="../imgs/106.k8s-workload-2.jpg" style="zoom:50%;" />
+
+可以发现，在k8s01上是没有程序运行文件的，但是通过PV和PVC可以部署。
 
 代码变动 [git commit]()
