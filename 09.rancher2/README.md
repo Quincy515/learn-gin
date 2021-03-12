@@ -2345,7 +2345,7 @@ Ingress
 
 相比之前的就是80是外网访问，32602/tcp是内网访问，如果之前在添加rancher时使用的是内网ip地址，则32602是不能被外网访问的。
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/92e0f4104a6ca73169a90838151f74a46f6f5a3e)
 
 ### 20. ClusterIP模式、服务发现基本入门和调用
 
@@ -2464,5 +2464,149 @@ Rancher2.4 使用 k8s-coredns 作为服务发现基础
 不在同一个命名空间，进行访问 http://192.168.172.4:8082/?host=mygo.myweb
 
 <img src="../imgs/99.k8s-mytest-5.jpg" style="zoom:100%;" />
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/c58fb3b2dba77a404a85258729664d8c1e587aab)
+
+### 21. 补充：部署nfs服务进行跨主机文件共享
+
+在前面部署服务的时候，如果需要在不同的主机上部署相同的api，进行负载均衡的设置。
+
+在前面是使用文件挂载，使用 -v 进行映射。
+
+在每一台机器上上传相同的目录进行挂载。如果节点特别多，都需要对每台服务器进行上传，
+
+使用 nfs 服务进行跨主机文件共享。
+
+Network File System
+
+> 通过网络，让不同机器、不同的操作系统可以共享彼此的文件。
+
+每台主机都是 centos7 系统，使用相同的用户名，正规来说应该再准备一个 nfs 服务器。
+
+这里使用 work 服务器部署 nfs。
+
+安装和配置：
+
+```bash
+sudo yum -y install nfs-utils
+sudo vi /etc/sysconfig/nfs
+
+// 加入 
+LOCKD_TCPPORT=30001#TCP锁使用的端口
+LOCKD_UDPPORT=30002#UDP锁使用的端口
+MOUNTD_PORT=30003#挂载使用的端口
+STATD_PORT=30004#状态使用的端口
+```
+
+因为这里部署k8s就把所有防火墙都关闭了。固定端口。
+
+启动/重启服务：
+
+```bash
+sudo systemctl restart rpcbind.service
+sudo systemctl restart nfs-server.service
+```
+
+开机启动：
+
+```bash
+sudo systemctl enable rpcbind.service
+sudo systemctl enable nfs-server.service
+```
+
+新建共享目录：
+
+```bash
+[custer@k8s02 ~]$ mkdir goapi
+[custer@k8s02 ~]$ ls
+goapi  myweb
+[custer@k8s02 ~]$ cd goapi/
+[custer@k8s02 goapi]$ echo "abc" >> test.text
+[custer@k8s02 goapi]$ ls
+test.text
+[custer@k8s02 goapi]$ cat test.text
+abc
+```
+
+编辑共享目录：
+
+```bash
+sudo vi /etc/exports
+```
+
+写入如下内容-共享目录 内容IP地址 配置
+
+```bash
+/home/custer/goapi 192.168.172.4/24(rw,async)
+```
+
+| 参数           | 作用                                                         |
+| -------------- | ------------------------------------------------------------ |
+| ro             | 只读                                                         |
+| rw             | 读写                                                         |
+| root_squash    | 当NFS客户端以root管理员访问时，映射为NFS服务器的匿名用户     |
+| no_root_squash | 当NFS客户端以root管理员访问时，映射为NFS服务器的root管理员   |
+| all_squash     | 无论NFS客户端用什么账户访问，均映射为NFS服务器的匿名用户     |
+| sync           | 同时将数据写入到内存与硬盘中，保证不丢失数据                 |
+| async          | 优先将数据保存到内存，然后再写入硬盘；这样效率更高，但可能会丢失数据 |
+
+查看挂载
+
+```bash
+showmount -e localhost		
+```
+
+会发现没有，于是重启 nfs 服务
+
+```bash
+sudo systemctl restart nfs-server.service
+```
+
+这样 nfs 服务器就启动成功了，可以在其他服务器上进行共享。
+
+来到另一台服务器上
+
+```bash
+sudo yum -y install nfs-utils
+```
+
+这样就好了，不需要启动nfs服务，直接执行如下操作：
+
+```bash
+showmount -e 192.168.172.5
+```
+
+尝试进行挂载
+
+```bash
+sudo mount -t nfs 192.168.172.5:/home/custer/goapi /home/custer/goapi
+```
+
+卸载只要 
+
+```bash
+sudo unmount /home/custer/goapi
+```
+
+查看挂载 `df -h`
+
+```bash
+[custer@k8s01 ~]$ mkdir goapi
+[custer@k8s01 ~]$ sudo mount -t nfs 192.168.172.5:/home/custer/goapi /home/custer/goapi
+[custer@k8s01 ~]$ cat goapi/test.text
+abc
+[custer@k8s01 ~]$ df -h
+文件系统                          容量  已用  可用 已用% 挂载点
+devtmpfs                          1.9G     0  1.9G    0% /dev
+tmpfs                             1.9G     0  1.9G    0% /dev/shm
+tmpfs                             1.9G   14M  1.9G    1% /run
+tmpfs                             1.9G     0  1.9G    0% /sys/fs/cgroup
+/dev/mapper/centos-root            17G  9.0G  8.1G   53% /
+/dev/sda1                        1014M  151M  864M   15% /boot
+tmpfs                             378M     0  378M    0% /run/user/1000
+192.168.172.5:/home/custer/goapi   17G  5.5G   12G   33% /home/custer/goapi
+```
+
+这样只需要在一台服务器上进行文件的上传，其他服务器只要挂载该目录，就都有了。
 
 代码变动 [git commit]()
