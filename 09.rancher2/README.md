@@ -2862,3 +2862,128 @@ sudo chmod +x myws
 
 wss://mywslb.myweb.192.168.172.4.xip.io/ws/echo
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/78bfb0b3db8d2bec06ca14a03d3c20d48d1f3060)
+
+### 26. k8s部署Redis(单节点)
+
+现在学习到的知识有 nfs、pv、pvc。
+
+第一步：首先创建文件夹
+
+```bash
+/home/custer/redis
+---n1
+------conf
+---------redis.conf
+------data(用于存放数据目录)
+------logs(用来存放日志)
+```
+
+在 nfs 的服务器创建
+
+```bash
+[custer@k8s02 ~]$ mkdir redis
+[custer@k8s02 ~]$ cd redis/
+[custer@k8s02 redis]$ vi redis.conf
+[custer@k8s02 redis]$ mkdir n1
+[custer@k8s02 redis]$ cp redis.conf n1
+[custer@k8s02 redis]$ cd n1
+[custer@k8s02 n1]$ ls
+redis.conf
+[custer@k8s02 n1]$ mkdir conf logs data
+[custer@k8s02 n1]$ ls
+conf  data  logs  redis.conf
+[custer@k8s02 n1]$ mv redis.conf conf/
+[custer@k8s02 n1]$ ls
+conf  data  logs
+[custer@k8s02 n1]$ cd ..
+[custer@k8s02 redis]$ ls
+n1  redis.conf
+[custer@k8s02 redis]$
+```
+
+其中配置文件中 
+
+```redis
+daemonize no(不以守护进程启动)
+port 6379
+bind 0.0.0.0
+logfile /logs/redis.log(日志文件)
+dir /data(数据目录)
+```
+
+第二步：在 NFS 服务器上 export 文件夹
+
+```bash
+sudo vi /etc/exports
+加入下一行：
+/home/custer/redis 192.168.172.0/24(rw,async,insecure,no_root_squash)
+然后执行:
+sudo exportfs -a
+或执行：
+sudo systemctl restart nfs.service
+重新加载配置
+```
+
+```bash
+[custer@k8s02 redis]$ sudo vi /etc/exports
+[custer@k8s02 redis]$ showmount -e localhost
+Export list for localhost:
+/home/custer/goapi 192.168.172.5/24
+[custer@k8s02 redis]$ sudo exportfs -a
+[custer@k8s02 redis]$ showmount -e localhost
+Export list for localhost:
+/home/custer/redis 192.168.172.0/24
+/home/custer/goapi 192.168.172.5/24
+[custer@k8s02 redis]$
+```
+
+第三步：配置PV和PVC
+
+全局，点击 mycluster 点击存储 点击持久卷 点击添加PV
+
+<img src="../imgs/120.k8s-pv-1.jpg" style="zoom:100%;" />
+
+<img src="../imgs/121.k8s-pv-2.jpg" style="zoom:100%;" />
+
+来到项目 myproject 选择 pvc 添加 pvc
+
+<img src="../imgs/122.k8s-pv-3.jpg" style="zoom:100%;" />
+
+下面就可以选择项目 myproject 的 workload 部署 redis 服务
+
+使用 `redis:5-alpine` 镜像，为了速度，可以选择提前 pull 下来
+
+```dockerfile
+docker pull redis:5-alpine
+```
+
+映射 
+
+```bash
+n1/conf:/conf
+n1/data:/data
+n1/logs:/logs
+```
+
+注意：n1是子目录，前面不要加/
+
+启动命令 
+
+```bash
+redis-server /conf/redis.conf
+```
+
+<img src="../imgs/123.k8s-redis-1.jpeg" style="zoom:100%;" />
+
+查看可以点击工作负载，点击 redis，执行命令行
+
+<img src="../imgs/125.k8s-redis-3.jpg" style="zoom:100%;" />
+
+<img src="../imgs/124.k8s-redis-2.jpg" style="zoom:100%;" />
+
+或者点击 pvc 选择 redispvc ，然后点击相关的工作负载
+
+<img src="../imgs/126.k8s-redis-4.jpg" style="zoom:100%;" />
+
+代码变动 [git commit]()
