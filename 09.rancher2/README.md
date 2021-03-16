@@ -2986,4 +2986,67 @@ redis-server /conf/redis.conf
 
 <img src="../imgs/126.k8s-redis-4.jpg" style="zoom:100%;" />
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/c1096e3ecfd99c9523699aa6da99cf020ddb671e)
+
+### 27. Go连接k8s中的Redis(单节点)
+
+上面在集群中部署了 redis，使用了持久卷 pv，使用了存储源是 NFS Share。
+
+`redistest.go`
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
+)
+
+func main() {
+	rdb := redis.NewClient(&redis.Options{
+    Addr:     "redis:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	r := gin.New()
+	r.Handle("GET", "/", func(c *gin.Context) {
+		key := c.Query("key")
+		ret, err := rdb.Get(c, key).Result()
+		if err != nil {
+			c.String(400, err.Error())
+		} else {
+			c.String(200, ret)
+		}
+	})
+	r.Run(":8082")
+}
+```
+
+这里的 Addr 填写什么？之前讲过服务发现，部署好的工作负载redis点击服务发现，可以看到同名的服务发现，所以这里 Addr 可以直接填写 redis:6379
+
+交叉编译
+
+```bash
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/myredis redistest.go
+```
+
+上传build之后的 myredis，上传到 nfs，修改可执行权限
+
+```bash
+sudo chmod +x myredis
+```
+
+在rancher中添加go代码相关的pv
+
+<img src="../imgs/127.k8s-gopv-1.jpg" style="zoom:100%;" />
+
+创建 pvc
+
+<img src="../imgs/128.k8s-gopv-2.jpg" style="zoom:100%;" />
+
+然后在工作负载里创建部署服务
+
+<img src="../imgs/129.k8s-myredis-1.jpeg" style="zoom:100%;" />
+
 代码变动 [git commit]()
+
