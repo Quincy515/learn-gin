@@ -2731,4 +2731,32 @@ PV 全局的集群资源，不针对某一个项目，或命名空间。
 
 可以发现，在k8s01上是没有程序运行文件的，但是通过PV和PVC可以部署。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/ab0fd40258f97b54494d8d1252f819e8f7ed3be7)
+
+### 23. k8s负载均衡加域名和路径重写
+
+<img src="../imgs/107.k8s-lb-1.jpeg" style="zoom:100%;" />
+
+添加负载均衡
+
+<img src="../imgs/108.k8s-lb-2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/109.k8s-lb-3.jpg" style="zoom:100%;" />
+
+<img src="../imgs/110.k8s-lb-4.jpg" style="zoom:100%;" />
+
+假设想像nginx一样，配置不同的路径访问api
+
+<img src="../imgs/111-k8s-lb-5.jpg" style="zoom:100%;" />
+
+现在访问 [mylb.myweb.192.168.172.4.xip.io/api](http://mylb.myweb.192.168.172.4.xip.io/api) 显示 404 page not found，
+
+因为 nginx 配置是自动配置路径，在 rancher 里或 k8s 里需要配置，文档：
+
+[在 Minikube 环境中使用 NGINX Ingress 控制器配置 Ingress | Kubernetes](https://kubernetes.io/zh/docs/tasks/access-application-cluster/ingress-minikube/)
+
+<img src="../imgs/112.k8s-lb-6.jpeg" style="zoom:100%;" />
+
+这时访问 [mylb.myweb.192.168.172.4.xip.io/api/ping](http://mylb.myweb.192.168.172.4.xip.io/api/ping) 就可以看到显示内容了。
+
 代码变动 [git commit]()
