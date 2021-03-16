@@ -2755,6 +2755,10 @@ PV 全局的集群资源，不针对某一个项目，或命名空间。
 
 [在 Minikube 环境中使用 NGINX Ingress 控制器配置 Ingress | Kubernetes](https://kubernetes.io/zh/docs/tasks/access-application-cluster/ingress-minikube/)
 
+```bash
+nginx.ingress.kubernetes.io/rewrite-target: /$1
+```
+
 <img src="../imgs/112.k8s-lb-6.jpeg" style="zoom:100%;" />
 
 这时访问 [mylb.myweb.192.168.172.4.xip.io/api/ping](http://mylb.myweb.192.168.172.4.xip.io/api/ping) 就可以看到显示内容了。
@@ -2773,4 +2777,88 @@ rancher 在 secret 里集中管理所有证书
 
 <img src="../imgs/115.k8s-ssl-3.jpeg" style="zoom:100%;" />
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/1a5bac9a594d0659fb70f9d4876468fa339c2b2d)
+
+### 25. rancher+k8s配置websocket
+
+新建文件 `ws.go` 
+
+```go
+package main
+
+import (
+	"flag"
+	"log"
+	"net/http"
+
+	"github.com/gorilla/websocket"
+)
+
+var addr = flag.String("addr", ":8081", "http service address")
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+func echo(w http.ResponseWriter, r *http.Request) {
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("upgrade: ", err)
+		return
+	}
+	defer c.Close()
+	for {
+		mt, message, err := c.ReadMessage()
+		if err != nil {
+			log.Println("read:", err)
+			break
+		}
+		log.Printf("recv: #{message}")
+		err = c.WriteMessage(mt, message)
+		if err != nil {
+			log.Println("write: ", err)
+			break
+		}
+	}
+}
+
+func main() {
+	http.HandleFunc("/echo", echo)
+	log.Fatal(http.ListenAndServe(*addr, nil))
+}
+```
+
+运行代码 `go run ws.go`
+
+使用在线工具进行测试 [Websocket在线测试(jsons.cn)](http://www.jsons.cn/websocket/)
+
+<img src="../imgs/116.ws-1.jpg" style="zoom:100%;" />
+
+使用 go build 交叉编译成可执行程序放到服务器上
+
+```bash
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/myws ws.go
+```
+
+上传到服务器之后，必须设置成可执行文件
+
+```bash
+sudo chmod +x myws
+```
+
+使用 rancher 部署
+
+<img src="../imgs/117-ws-2.jpeg" style="zoom:100%;" />
+
+因为使用的是 cluster ip，所以这里加 lb
+
+<img src="../imgs/118.ws.3.jpg" style="zoom:100%;" />
+
+<img src="../imgs/119.ws-4.jpg" style="zoom:100%;" />
+
+配置证书，和上面一样，但是通过ssl访问ws，访问
+
+wss://mywslb.myweb.192.168.172.4.xip.io/ws/echo
+
