@@ -3050,3 +3050,20 @@ sudo chmod +x myredis
 
 代码变动 [git commit]()
 
+### 28. 使用ConfigMap挂载Redis配置文件
+
+在 NFS 主机上是有 redis文件夹，包含 conf、data、logs文件，
+
+在redis运行时会生成对应的日志和数据。
+
+由于现在使用了 pv 和 pvc，也挂载了 conf 配置文件，这样修改配置，还需要上传到服务器。
+
+在 rancher 里有资源，Config Map配置映射可以使用，这里是专门做映射配置文件的。
+
+点击添加配置映射
+
+<img src="../imgs/130.k8s-config-1.jpg" style="zoom:100%;" />
+
+再来到 myproject 再部署个新的服务
+
+<img src="../imgs/131.k8s-redis-1.jpeg" style="zoom:100%;" />
