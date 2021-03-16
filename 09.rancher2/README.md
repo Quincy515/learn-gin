@@ -2759,4 +2759,18 @@ PV 全局的集群资源，不针对某一个项目，或命名空间。
 
 这时访问 [mylb.myweb.192.168.172.4.xip.io/api/ping](http://mylb.myweb.192.168.172.4.xip.io/api/ping) 就可以看到显示内容了。
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/9dfb315218eaa13eb8e4324520db127ca8bcb1a2)
+
+### 24. rancher负载均衡配置SSL的方法
+
+上面在负载均衡配置了域名和路径的重写，下面配置ssl
+
+<img src="../imgs/113.k8s-ssl-1.jpg" style="zoom:100%;" />
+
+rancher 在 secret 里集中管理所有证书
+
+<img src="../imgs/114.k8s-ssl-2.jpg" style="zoom:100%;" />
+
+<img src="../imgs/115.k8s-ssl-3.jpeg" style="zoom:100%;" />
+
 代码变动 [git commit]()
