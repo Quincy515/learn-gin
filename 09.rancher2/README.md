@@ -3225,4 +3225,96 @@ redis                               5-alpine                1516bcc5a32f        
 docker pull 192.168.172.5:5000/redis:v1
 ```
 
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/80f975284e6dfa1139a3ba78635fbaec5025dbb5)
+
+### 30. 快速搭建gitlab
+
+https://hub.docker.com/r/gitlab/gitlab-ce
+
+Gitlab 有社区版和收费版，这里选择 ce 就是社区版即可。
+
+```bash
+docker pull gitlab/gitlab-ce
+```
+
+创建专属 pv，
+
+在 NFS 服务器上新建目录和文件 
+
+```bash
+/home/custer/gitlab
+/home/custer/gitlab/config
+/home/custer/gitlab/logs
+/home/custer/gitlab/data
+```
+
+然后修改 NFS 配置
+
+```bash
+sudo vi /etc/exports
+```
+
+加入一行
+
+```bash
+/home/custer/gitlab 192.168.172.0/24(rw,async,insecure,no_root_squash)
+```
+
+然后执行 
+
+```bash
+sudo exportfs -a
+```
+
+重新加载配置
+
+```bash
+[custer@k8s02 ~]$ mkdir gitlab && cd gitlab/
+[custer@k8s02 gitlab]$ mkdir config logs data
+[custer@k8s02 gitlab]$ ls
+config  data  logs
+[custer@k8s02 ~]$ sudo vi /etc/exports
+[sudo] custer 的密码：
+[custer@k8s02 gitlab]$ sudo exportfs -a
+[custer@k8s02 gitlab]$ showmount -e localhost
+Export list for localhost:
+/home/custer/gitlab 192.168.172.0/24
+/home/custer/redis  192.168.172.0/24
+/home/custer/goapi  192.168.172.5/24
+```
+
+进入集群 mycluster 创建pv
+
+<img src="../imgs/134.k8s-gitlab-1.jpg" style="zoom:100%;" />
+
+进入项目 myproject 创建 pvc
+
+<img src="../imgs/135.k8s-gitlab-2.jpg" style="zoom:100%;" />
+
+接下来创建工作负载 workload，注意挂载内容
+
+```bash
+/etc/gitlab -> logs
+/var/opt/gitlab -> data
+/var/log/gitlab -> config
+```
+
+配置负载均衡时，别忘了加
+
+```bash
+nginx.ingress.kubernetes.io/rewrite-target
+```
+
+<img src="../imgs/136.k8s-gitlab-3.jpeg" style="zoom:100%;" />
+
+cluster ip 添加负载均衡
+
+<img src="../imgs/137.k8s-gitlab-4.jpg" style="zoom:100%;" />
+
+部署好就可以直接访问了，第一次访问新建密码，默认用户名为 root
+
+<img src="../imgs/138.k8s-gitlab-5.jpg" style="zoom:100%;" />
+
 代码变动 [git commit]()
+
+
