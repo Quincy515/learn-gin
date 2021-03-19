@@ -3048,7 +3048,7 @@ sudo chmod +x myredis
 
 <img src="../imgs/129.k8s-myredis-1.jpeg" style="zoom:100%;" />
 
-代码变动 [git commit]()
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/f49af14481cca66d2b174acbbc63f23fdaad1aaa)
 
 ### 28. 使用ConfigMap挂载Redis配置文件
 
@@ -3067,3 +3067,162 @@ sudo chmod +x myredis
 再来到 myproject 再部署个新的服务
 
 <img src="../imgs/131.k8s-redis-1.jpeg" style="zoom:100%;" />
+
+代码变动 [git commit](https://github.com/custer-go/learn-gin/commit/3b90c62529287a13252221603d4e1d105c72bb09)
+
+### 29. 搭建简易私有镜像仓库
+
+公有镜像库：docker hub，访问速度慢或安全方面的考虑
+
+私有镜像库：
+
+1. 使用一个简单的官方 docker registry 镜像
+2. 使用 harbor (如果你需要管理功能)
+
+harbor 是由 VMware 公司开源的企业级 Docker Registry 管理项目，它包括权限管理(RBAC)、LDAP、日志审核、管理界面、自我注册、镜像赋值和中文支持等功能。
+
+应该有一个独力的服务器做为镜像仓库。
+
+镜像地址 https://hub.docker.com/_/registry，在服务器上执行 
+
+```dockerfile
+docker pull registry
+```
+
+创建 `registry` 文件夹，进入 `registry` 文件夹并创建 `data` 目录，和 `config.yml` 配置文件。
+
+```yaml
+version: 0.1
+log:
+ fields:
+ service: registry
+storage:
+ delete:
+  enabled: true
+ cache:
+  blobdescriptor: inmemory
+ filesystem:
+  rootdirectory: /var/lib/registry
+http:
+ addr: :5000
+ headers:
+  X-Content-Type-Options: [nosniff]
+health:
+ storagedriver:
+ enabled: true
+ interval: 10s
+ threshold: 3
+```
+
+运行 
+
+```dockerfile
+docker run  -d --name registry \
+-v /home/custer/registry/config.yml:/etc/docker/registry/config.yml \
+-v /home/custer/registry/data:/var/lib/registry \
+-p 5000:5000 registry 
+```
+
+也可以直接 用rancher 安装一个单机的容器。
+
+<img src="../imgs/132.k8s-registry-1.jpeg" style="zoom:100%;" />
+
+使用 docker 操作私有镜像时，出现错误 
+
+```bash
+http: server gave HTTP response to HTTPS client
+```
+
+```bash
+Error response from daemon: Get https://192.168.172.5:5000/v2/: http: server gave HTTP response to HTTPS client
+```
+
+因为docker为了安全，需要 https 。但是我们可以让其不需要。
+
+要修改的是 `sudo vi /etc/docker/daemon.json` ，ip 填写创建服务器的内网地址。
+
+```json
+{
+  "insecure-registries":["192.168.172.5:5000"]
+}
+```
+
+然后重载 docker 即可 `sudo systemctl reload docker`
+
+进行测试
+
+找个已经有的镜像，打个tag
+
+```bash
+docker tag redis:5-alpine 192.168.172.5:5000/redis:v1
+```
+
+```bash
+[custer@k8s02 ~]$ docker tag redis:5-alpine 192.168.172.5:5000/redis:v1
+[custer@k8s02 ~]$ docker images|grep redis
+192.168.172.5:5000/redis            v1                      1516bcc5a32f        3 days ago          29.3MB
+redis                               5-alpine                1516bcc5a32f        3 days ago          29.3MB
+```
+
+传到我们的私有镜像里
+
+```bash
+docker push 192.168.172.5:5000/redis:v1
+```
+
+```bash
+[custer@k8s02 ~]$ docker push 192.168.172.5:5000/redis:v1
+The push refers to repository [192.168.172.5:5000/redis]
+75d41083d3d5: Pushed
+083bd7dfa116: Pushed
+cad9a59b95e7: Pushed
+e4519a898f39: Pushed
+c3920bf21c1f: Pushed
+cb381a32b229: Pushed
+v1: digest: sha256:215fc5ec3e5b1f9ac06c47d124294a8ce448e4225527dacfc7fb55e525aee191 size: 1571
+```
+
+没有管理界面，使用 curl 查看API（[https](https://docs.docker.com/registry/spec/api/)[://docs.docker.com/registry/spec/api/#](https://docs.docker.com/registry/spec/api/)[listing-repositories](https://docs.docker.com/registry/spec/api/)）
+
+```bash
+curl http://192.168.172.5:5000/v2/_catalog  (查看列表)
+
+curl http://192.168.172.5:5000/v2/redis/manifests/v1  (查看redis镜像详情)
+
+curl http://192.168.172.5:5000/v2/redis/tags/list
+
+curl -X DELETE http://192.168.172.5:5000/v2/redis/manifests/xxx
+```
+
+垃圾回收：
+
+```bash
+registry garbage-collect /etc/docker/registry/config.yml
+```
+
+垃圾回收在 rancher 部署服务里的 执行命令行中执行
+
+<img src="../imgs/133.k8s-registry-2.jpg" style="zoom:100%;" />
+
+执行docker tag 会生成一个 docker image，push 操作之后本地的该镜像就可以删除了。
+
+```bash
+[custer@k8s02 ~]$ docker images
+REPOSITORY                          TAG                     IMAGE ID            CREATED             SIZE
+redis                               5-alpine                1516bcc5a32f        3 days ago          29.3MB
+192.168.172.5:5000/redis            v1                      1516bcc5a32f        3 days ago          29.3MB
+[custer@k8s02 ~]$ docker rmi 192.168.172.5:5000/redis:v1
+Untagged: 192.168.172.5:5000/redis:v1
+Untagged: 192.168.172.5:5000/redis@sha256:215fc5ec3e5b1f9ac06c47d124294a8ce448e4225527dacfc7fb55e525aee191
+[custer@k8s02 ~]$ docker images
+REPOSITORY                          TAG                     IMAGE ID            CREATED             SIZE
+redis                               5-alpine                1516bcc5a32f        3 days ago          29.3MB
+```
+
+在别的地方拉取 registry 的镜像
+
+```bash
+docker pull 192.168.172.5:5000/redis:v1
+```
+
+代码变动 [git commit]()
